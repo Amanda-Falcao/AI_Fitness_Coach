@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data gerada localmente pelo RAG (ChromaDB)
+data/chroma_db/
+data/*.sqlite
+
+# Logs e Checkpoints
+*.log
