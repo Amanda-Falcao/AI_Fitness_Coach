@@ -2,21 +2,21 @@
 
 ## 🚀 Objetivo
 
-Este projeto demonstra um agente de IA completo utilizando a arquitetura **LangGraph** para orquestrar um fluxo de trabalho complexo, gerando planos de treino de musculação personalizados e detalhados.
+Este projeto demonstra um agente de IA completo utilizando a arquitetura **LangGraph** para orquestrar um fluxo de trabalho, gerando planos de treino de musculação personalizados e detalhados.
 
 ## 🛠️ Requisitos Técnicos
 
 O agente integra os seguintes componentes:
 * **LLM Principal:** **Groq** (Llama 3) para raciocínio e geração de conteúdo.
 * **Busca na Web:** **Tavily Search** (Ferramenta Externa).
-* **Cálculos:** Funções Python nativas (**IMC** e gasto calórico).
+* **Cálculos:** Funções de cálculo (**IMC** e gasto calórico).
 * **RAG:** **Hugging Face Embeddings** + **ChromaDB** (Base de Conhecimento Interna).
 
 ## 📥 Instalação
 
 1.  **Clone o Repositório:**
     ```bash
-    git clone [LINK_DO_REPOSITORIO]
+    git clone https://github.com/Amanda-Falcao/AI_Fitness_Coach.git
     cd AI_FITNESS_COACH
     ```
 
