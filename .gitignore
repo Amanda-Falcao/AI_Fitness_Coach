@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
 env/
 .env
 
@@ -10,7 +11,9 @@ env/
 
 # Data gerada localmente pelo RAG (ChromaDB)
 data/chroma_db/
+dados/chroma_db/
 data/*.sqlite
 
 # Logs e Checkpoints
 *.log
+outputs/

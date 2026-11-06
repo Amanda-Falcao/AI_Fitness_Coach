@@ -1,10 +1,10 @@
 langgraph
-langchain
 langchain-core
-langchain-groq 
-tavily-python   
-pydantic
-chromadb              
-sentence-transformers  
+langchain-groq
+tavily-python
+chromadb
+sentence-transformers
 python-dotenv
-langchain-community
+langchain-chroma
+langchain-huggingface
+langchain-text-splitters

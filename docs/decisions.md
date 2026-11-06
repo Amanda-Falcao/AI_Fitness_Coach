@@ -1,0 +1,81 @@
+# Architecture Decision Records
+
+## ADR-001 — Extract deterministic calculations and validate their inputs
+
+- **Status:** Accepted
+- **Context:** The fitness calculations were implemented separately in `ferramentas_ai.py` and the agent notebook. They used different assumptions, omitted input validation, and returned unstructured text.
+- **Decision:** Put the calculations in `app/tools/calculations.py` as pure functions, validate the profile before computing, and expose a small immutable result object. The agent notebook delegates to this shared implementation.
+- **Alternatives considered:** Keep calculations in the notebook; use a Pydantic model for validation; remove calorie estimates until a more evidence-based model exists.
+- **Technical rationale:** A pure function is easy to test without loading an LLM or calling an external API. Standard-library validation avoids adding a runtime dependency for this small contract.
+- **Expected benefits:** One source of truth, explicit failures for invalid profile data, repeatable unit tests, and clearer separation between calculation and agent orchestration.
+- **Trade-offs and limitations:** Activity multipliers and the ±400 kcal goal adjustment are retained as rough prototype heuristics for continuity. They are not individualized nutrition advice and need evidence review before being presented as recommendations. The current equation supports only `male` and `female` constants.
+
+## ADR-002 — Read integration settings explicitly from the environment
+
+- **Status:** Accepted
+- **Context:** API client initialization was mixed into tool modules and could fail silently when a key was missing. Different integrations do not need to be mandatory in every execution path.
+- **Decision:** Add an immutable `Settings` object with explicit `from_env` validation and per-integration required flags. Importing the module does not instantiate clients or read secrets.
+- **Alternatives considered:** Instantiate service clients at module import; require every API key for all use cases; add a settings framework.
+- **Technical rationale:** Explicit construction makes configuration failures predictable and lets local calculations run without external credentials. The standard library is sufficient for the current settings surface.
+- **Expected benefits:** Clear missing-key errors, no import-time network/client side effects, and easier dependency injection in later stages.
+- **Trade-offs and limitations:** `from_env` reads process environment variables only. Loading a `.env` file remains the responsibility of the application entry point and will be addressed when that entry point is implemented.
+
+## ADR-003 — Separate RAG ingestion from retrieval and use stable chunk identifiers
+
+- **Status:** Accepted
+- **Context:** Ingestion lived only in a notebook, the agent duplicated retriever setup, chunk IDs were generated implicitly, and the database contained 10 vectors while the recorded ingestion output showed 5 chunks.
+- **Decision:** Move loading/chunking/upserting to `app/rag/ingestion.py`, embedding construction to `app/rag/embeddings.py`, and validated query setup to `app/rag/retriever.py`. Keep chunk size 1000, overlap 200, the existing Hugging Face model, the existing Chroma collection, and top-k 3 in the agent. Derive IDs from normalized source, chunk position, and text; upsert first and remove stale IDs for that source only after the upsert succeeds.
+- **Alternatives considered:** Rebuild the full collection on every ingestion; preserve implicit Chroma IDs; add a separate vector database or retrieval framework.
+- **Technical rationale:** Stable IDs make repeated ingestion idempotent for unchanged chunks. Updating before deleting stale chunks reduces the chance of losing the previous source if embedding/upsert fails. Isolating retrieval allows the agent to fail with an actionable error when the knowledge base is unavailable.
+- **Expected benefits:** Reproducible ingestion, fewer duplicate vectors, consistent top-k configuration, independent testing, and clearer separation between offline preparation and online query.
+- **Trade-offs and limitations:** This does not deduplicate historical chunks whose stored `source` metadata differs from the normalized repository-relative path. Similarity thresholds, metadata filters, and retrieval quality remain unevaluated; existing retrieval parameters are preserved until an evaluation set exists.
+
+## ADR-004 — Build the LangGraph workflow from injected dependencies
+
+- **Status:** Accepted
+- **Context:** State, model invocation, routing, graph assembly, and a second LLM instance were all defined in the agent notebook. The graph had no explicit recursion limit and its core routing could not be tested without running notebook setup.
+- **Decision:** Move state to `app/agent/state.py`, model and routing nodes to `app/agent/nodes.py`, and graph assembly to `app/agent/graph.py`. Inject the model and tools when building the graph. Keep the existing model/tool loop and set a 12-step recursion limit at execution.
+- **Alternatives considered:** Replace the agent with a linear chain; add more planning/validation nodes immediately; keep the entire graph in the notebook.
+- **Technical rationale:** Dependency injection keeps API clients and model creation at the composition boundary, while pure routing behavior can be tested with lightweight doubles. The existing loop already expresses the required tool cycle, so additional nodes should follow an observed need.
+- **Expected benefits:** Easier explanation and testing of LangGraph state/transitions, one model configuration, and bounded tool-loop execution.
+- **Trade-offs and limitations:** The graph factory still requires LangGraph at runtime. The recursion limit is a safety ceiling, not proof that a generated plan is correct; LLM/API failures are not retried or persisted yet.
+
+## ADR-005 — Add a command-line composition root for application execution
+
+- **Status:** Accepted
+- **Context:** Running the agent required executing notebook cells in the right order. Tool creation, model setup, profile input, graph invocation, and output writing were coupled to the notebook.
+- **Decision:** Add `app/main.py` as a CLI, `app/runtime.py` as the composition root, prompt construction as a pure module, and lazy factories for calculation, RAG, and Tavily tools. Keep the notebook as an experimental caller of the shared runtime.
+- **Alternatives considered:** Add a web API; keep notebooks as the only interface; initialize model and tool clients at module import.
+- **Technical rationale:** A CLI makes the prototype runnable in scripts and containers without adding a web framework. Lazy factories make local modules importable without credentials or all optional AI packages.
+- **Expected benefits:** Reproducible non-notebook execution, validated profile input, explicit configuration checks, and a testable graph invocation boundary.
+- **Trade-offs and limitations:** The CLI requires both Groq and Tavily credentials and an ingested Chroma collection. There is no HTTP API, interactive chat, retry policy, or persistent conversation store.
+
+## ADR-006 — Package runtime and test environments in separate container targets
+
+- **Status:** Accepted
+- **Context:** The host Python lacks pip/venv, so the automated tests could not run there. The application also depends on a larger AI stack and model cache that should not be confused with test dependencies.
+- **Decision:** Add a Docker runtime target with the declared application dependencies and a separate test target with pytest plus the isolated source/tests. Install the official CPU PyTorch wheel because this project does not require GPU inference. Use Compose volumes for Chroma and Hugging Face cache, and a bind mount for generated plans. Exclude `.env`, the checked-in local vector index, notebooks, and docs from the runtime build context.
+- **Alternatives considered:** Install system Python packages; create a single image containing runtime and test-only dependencies; use a hosted vector database or model service.
+- **Technical rationale:** Container targets provide a repeatable place to install dependencies without modifying the host Python. Separating the test target keeps the lightweight deterministic suite independent of model packages.
+- **Expected benefits:** Reproducible dependency setup, a path to run pytest and the CLI in an isolated environment, and avoidance of CUDA libraries in the CPU runtime image.
+- **Trade-offs and limitations:** The runtime image includes Sentence Transformers and Chroma, which make it substantially larger than the test image. Model weights are downloaded at runtime and cached in a volume. The image build was smoke-tested, but a full plan generation still requires API credentials and was not run.
+
+## ADR-007 — Use standalone LangChain integrations for Hugging Face and Chroma
+
+- **Status:** Accepted
+- **Context:** The first runtime smoke test showed LangChain 1.x and a deprecation warning that `langchain-community` is being sunset. Chroma and Hugging Face now have dedicated integration packages, and the project only needs basic UTF-8 text loading.
+- **Decision:** Replace community imports for embeddings and Chroma with `langchain-huggingface` and `langchain-chroma`. Read the source text with the standard library and construct a LangChain `Document`; depend directly on `langchain-text-splitters`. Implement the retriever tool with `langchain-core`'s `@tool` around the retriever instead of relying on a legacy helper module.
+- **Alternatives considered:** Keep deprecated imports and pin older LangChain versions; rely on `langchain-community`; use Chroma or Hugging Face APIs without their LangChain adapters.
+- **Technical rationale:** Standalone integrations match the packages recommended by current LangChain documentation and keep document loading simple. The core tool decorator is sufficient for this single retrieval function.
+- **Expected benefits:** Remove the observed community deprecation warning, reduce coupling to legacy helper paths, and make the RAG tool's behavior explicit, including empty retrieval handling.
+- **Trade-offs and limitations:** The exact dependency versions are still unpinned. The integration packages remain part of the runtime's model/vector stack and are not included in the lightweight test target.
+
+## ADR-008 — Test tool adapters with injected boundaries and offline doubles
+
+- **Status:** Accepted
+- **Context:** The calculations and graph routing had unit coverage, but the LangChain adapters for calculation, RAG, and Tavily were not directly exercised. Tests must not depend on network credentials or real API calls.
+- **Decision:** Add adapter contract tests that replace the LangChain decorator and external Tavily client with small test doubles. Exercise input validation, result formatting, empty RAG results, and safe wrapping of Tavily failures.
+- **Alternatives considered:** Make live API calls in the test suite; add a mocking framework; test only the underlying calculation and retriever modules.
+- **Technical rationale:** The Python standard library can supply the module doubles needed for these narrow boundaries, and pytest is already the only test dependency. This keeps the suite fast and deterministic while testing the behavior the agent actually calls.
+- **Expected benefits:** Tool adapter regressions are detected without spending API quota or requiring secrets, and upstream error details are not surfaced in user-facing messages.
+- **Trade-offs and limitations:** The decorator and SDK are represented by test doubles, so these tests do not guarantee compatibility with every future LangChain or Tavily release. Runtime container import smoke checks cover package availability but do not exercise live services.

@@ -2,9 +2,9 @@ import os
 from typing import List, Dict, Any
 from langchain_core.tools import tool
 from tavily import TavilyClient
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.tools.retriever import create_retriever_tool
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from app.tools.calculations import calculate_fitness_metrics
 
 # --- CONFIGURAÇÃO ---
 try:
@@ -21,17 +21,18 @@ def calcular_metricas(weight_kg: float, height_cm: float, age_years: int, gender
     
     Argumentos: weight_kg (float), height_cm (float), age_years (int), gender (str).
     """
-    height_m = height_cm / 100
-    imc = weight_kg / (height_m ** 2)
-    
-    if gender.lower() == "male":
-        tmb = (10 * weight_kg) + (6.25 * height_cm) - (5 * age_years) + 5
-    elif gender.lower() == "female":
-        tmb = (10 * weight_kg) + (6.25 * height_cm) - (5 * age_years) - 161
-    else:
-        tmb = 0
-        
-    return f"Métricas calculadas: IMC = {imc:.2f} | TMB = {tmb:.0f} calorias/dia."
+    metrics = calculate_fitness_metrics(
+        age_years=age_years,
+        weight_kg=weight_kg,
+        height_cm=height_cm,
+        sex=gender,
+        training_days_per_week=0,
+        goal="maintenance",
+    )
+    return (
+        f"Reference calculations (estimates): BMI = {metrics.bmi:.2f} | "
+        f"BMR = {metrics.basal_metabolic_rate_kcal} kcal/day."
+    )
 
 
 # --- FERRAMENTA 2: BUSCA NA WEB (Tavily) ---
@@ -75,8 +76,14 @@ def criar_rag_tool(retriever_instance):
         return recuperar_detalhes_exercicio_falha
 
     # Se o retriever estiver OK, cria a Tool oficial
-    return create_retriever_tool(
-        retriever_instance,
-        "recuperar_detalhes_exercicio",
-        "Busca informações detalhadas na base de conhecimento interna sobre exercícios, técnicas, séries e repetições ideais (RAG)."
-    )
+    @tool
+    def recuperar_detalhes_exercicio(query: str) -> str:
+        """Search the internal knowledge base for exercises, techniques, sets, and repetitions."""
+        if not query or not query.strip():
+            raise ValueError("query must be a non-empty string")
+        documents = retriever_instance.invoke(query.strip())
+        if not documents:
+            return "No relevant knowledge documents were found."
+        return "\n\n".join(document.page_content for document in documents)
+
+    return recuperar_detalhes_exercicio

@@ -1,0 +1,19 @@
+services:
+  fitness-coach:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CHROMA_PERSIST_DIRECTORY: /app/data/chroma_db
+      HF_HOME: /root/.cache/huggingface
+    volumes:
+      - chroma-data:/app/data/chroma_db
+      - hf-cache:/root/.cache/huggingface
+      - ./outputs:/app/outputs
+
+volumes:
+  chroma-data:
+  hf-cache:
