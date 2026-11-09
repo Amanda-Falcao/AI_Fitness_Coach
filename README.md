@@ -140,15 +140,6 @@ A mesma suíte determinística e a verificação da sintaxe dos notebooks são e
 
 A CLI é o ponto de entrada reproduzível. A base vetorial não é distribuída no repositório: ela é criada localmente pela etapa de ingestão a partir de `dados/conhecimento_fitness.txt`.
 
-## Limitações conhecidas
-
-- O benchmark de cinco consultas mede atualmente a recuperação de trechos específicos; relevância semântica e fidelidade das respostas ainda não foram medidas. O top-k permanece em 3 e não há limiar de similaridade.
-- A proveniência das citações é validada, mas a relação de implicação entre a evidência e cada afirmação ainda não é avaliada automaticamente.
-- Não há novas tentativas automáticas de chamadas à API, acompanhamento de custos por requisição nem rastros persistentes do agente.
-- Os cálculos de condicionamento físico e gasto energético são heurísticas simplificadas e não devem ser usados como orientação clínica ou nutricional.
-- A validação da saída verifica a estrutura e a presença de campos de segurança, mas não avalia semanticamente a segurança dos exercícios ou sua adequação médica.
-- Registros existentes no Chroma com metadados de origem antigos podem coexistir com registros criados pela nova rotina de ingestão.
-
 ## Próximas melhorias
 
 - Ampliar o conjunto de evidências do benchmark e revisar os resultados da recuperação com embeddings reais antes de ajustar o chunking ou o top-k.
