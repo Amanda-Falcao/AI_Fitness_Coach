@@ -1,4 +1,5 @@
 from argparse import Namespace
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +18,38 @@ VALID_ARGS = Namespace(
 )
 
 
+def valid_plan_content(sessions_per_week=5):
+    return json.dumps({
+        "title": "Plano de três semanas",
+        "weeks": [
+            {
+                "week": week,
+                "sessions": [
+                    {
+                        "day": day,
+                        "title": f"Treino {day}",
+                        "exercises": [{
+                            "name": "Agachamento livre",
+                            "sets": 3,
+                            "reps": "8-12",
+                            "rest_seconds": 90,
+                            "technique_cues": ["Mantenha a coluna neutra."],
+                        }],
+                    }
+                    for day in range(1, sessions_per_week + 1)
+                ],
+            }
+            for week in range(1, 4)
+        ],
+        "coach_analysis": "Aumente a carga gradualmente mantendo a técnica.",
+        "safety": {
+            "disclaimer": "Plano informativo.",
+            "stop_conditions": ["Interrompa se sentir dor aguda."],
+            "seek_professional_if": ["Procure profissional em caso de lesão."],
+        },
+    })
+
+
 def test_profile_validation_returns_only_expected_profile_fields():
     profile = validate_profile(VALID_ARGS)
 
@@ -31,13 +64,24 @@ def test_profile_validation_rejects_invalid_values():
         validate_profile(invalid_args)
 
 
+@pytest.mark.parametrize("frequency", [0, 8, True, 2.5])
+def test_profile_validation_requires_one_to_seven_complete_weekly_sessions(frequency):
+    invalid_args = Namespace(**{**vars(VALID_ARGS), "frequency": frequency})
+
+    with pytest.raises(ValueError, match="frequency"):
+        validate_profile(invalid_args)
+
+
 def test_prompt_requests_three_weeks_and_expected_session_count():
     prompt = build_plan_prompt(
         {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"}
     )
 
-    assert "exactly 15 sessions" in prompt
+    assert "exactly 15 distinct sessions" in prompt
     assert "three weeks" in prompt
+    assert '"safety"' in prompt
+    assert "valid JSON object" in prompt
+    assert prompt.count('"day":') == 15
 
 
 def test_run_plan_generation_saves_injected_graph_result(tmp_path):
@@ -45,7 +89,7 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
         def invoke(self, state, config):
             assert state["messages"][0]["role"] == "user"
             assert config["recursion_limit"] == 12
-            return {"messages": [SimpleNamespace(content="# Training plan\n")]}
+            return {"messages": [SimpleNamespace(content=valid_plan_content())]}
 
     output = run_plan_generation(
         {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"},
@@ -53,4 +97,20 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
         tmp_path / "plan.md",
     )
 
-    assert output.read_text(encoding="utf-8") == "# Training plan\n"
+    assert output.read_text(encoding="utf-8").startswith("# Plano de três semanas\n")
+    assert output.read_text(encoding="utf-8").count("### Sessão") == 15
+
+
+def test_run_plan_generation_does_not_write_invalid_output(tmp_path):
+    class InvalidGraph:
+        def invoke(self, state, config):
+            return {"messages": [SimpleNamespace(content='{"weeks": []}') ]}
+
+    destination = tmp_path / "invalid.md"
+    with pytest.raises(RuntimeError, match="output contract"):
+        run_plan_generation(
+            {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"},
+            InvalidGraph(),
+            destination,
+        )
+    assert not destination.exists()

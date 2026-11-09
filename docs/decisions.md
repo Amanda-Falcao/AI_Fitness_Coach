@@ -28,7 +28,7 @@
 - **Alternatives considered:** Rebuild the full collection on every ingestion; preserve implicit Chroma IDs; add a separate vector database or retrieval framework.
 - **Technical rationale:** Stable IDs make repeated ingestion idempotent for unchanged chunks. Updating before deleting stale chunks reduces the chance of losing the previous source if embedding/upsert fails. Isolating retrieval allows the agent to fail with an actionable error when the knowledge base is unavailable.
 - **Expected benefits:** Reproducible ingestion, fewer duplicate vectors, consistent top-k configuration, independent testing, and clearer separation between offline preparation and online query.
-- **Trade-offs and limitations:** This does not deduplicate historical chunks whose stored `source` metadata differs from the normalized repository-relative path. Similarity thresholds, metadata filters, and retrieval quality remain unevaluated; existing retrieval parameters are preserved until an evaluation set exists.
+- **Trade-offs and limitations:** This does not deduplicate historical chunks whose stored `source` metadata differs from the normalized repository-relative path. Similarity thresholds and metadata filters remain unevaluated; existing retrieval parameters are preserved until the baseline benchmark is run and reviewed.
 
 ## ADR-004 — Build the LangGraph workflow from injected dependencies
 
@@ -79,3 +79,23 @@
 - **Technical rationale:** The Python standard library can supply the module doubles needed for these narrow boundaries, and pytest is already the only test dependency. This keeps the suite fast and deterministic while testing the behavior the agent actually calls.
 - **Expected benefits:** Tool adapter regressions are detected without spending API quota or requiring secrets, and upstream error details are not surfaced in user-facing messages.
 - **Trade-offs and limitations:** The decorator and SDK are represented by test doubles, so these tests do not guarantee compatibility with every future LangChain or Tavily release. Runtime container import smoke checks cover package availability but do not exercise live services.
+
+## ADR-009 — Add a small deterministic retrieval benchmark before tuning RAG
+
+- **Status:** Accepted
+- **Context:** The RAG configuration preserved prototype chunking and top-k values, but there was no repeatable way to observe whether known evidence appeared in retrieved results. Adding an LLM-as-judge framework would add cost and subjective behavior before a baseline exists.
+- **Decision:** Add five reviewed query/evidence pairs and a dependency-free runner reporting hit-rate@k, MRR, and per-query mean retrieval latency. Keep semantic answer-quality evaluation as a separate qualitative activity.
+- **Alternatives considered:** Tune chunk size/top-k from intuition; add a hosted or LLM-based evaluation framework immediately; compare only generated answers manually with no recorded metric.
+- **Technical rationale:** Exact evidence occurrence is deterministic, inexpensive, and useful as a regression check for this compact corpus. MRR accounts for rank while hit rate shows whether a target is present in the top-k.
+- **Expected benefits:** Establish a repeatable retrieval baseline, enable evidence-based changes later, and teach the distinction between deterministic retrieval metrics and qualitative generation quality.
+- **Trade-offs and limitations:** Five cases are too few for broad quality claims. Exact string matching can miss semantically equivalent passages and does not evaluate answer grounding, safety, or plan usefulness. Latency varies with hardware and warm/cold model state.
+
+## ADR-010 — Validate a strict structured plan contract before saving
+
+- **Status:** Accepted
+- **Context:** The agent returned unrestricted Markdown, so the CLI could save an empty, incomplete, or unexpectedly shaped plan without checking the requested session count or the presence of safety guidance.
+- **Decision:** Prompt the agent for one JSON object with a fixed schema. Validate its exact fields, three ordered weeks, per-week session count, unique day numbers, bounded exercise parameters, and required safety fields using the standard library. Render validated data to Markdown in application code and refuse to write invalid output.
+- **Alternatives considered:** Keep free-form Markdown and rely only on prompt wording; add a schema-validation dependency; use provider-native structured output, which would introduce provider/model-specific behavior and potentially affect tool calling.
+- **Technical rationale:** JSON parsing and explicit checks are deterministic, dependency-free, easy to test, and keep presentation separate from model generation. Failing closed prevents malformed plans from being mistaken for successful files.
+- **Expected benefits:** Predictable output shape, exact session-count enforcement, stable Markdown formatting, and required safety disclaimer/stop/referral fields.
+- **Trade-offs and limitations:** The model may fail the contract, in which case the CLI stops without saving; no automatic repair call is made to avoid hidden extra cost and latency. Structural safety fields do not establish factual or medical safety, and content still requires human review.

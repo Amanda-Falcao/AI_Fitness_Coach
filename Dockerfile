@@ -18,6 +18,7 @@ RUN python -m pip install --no-cache-dir torch --index-url https://download.pyto
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
+COPY evaluation/ ./evaluation/
 COPY dados/conhecimento_fitness.txt ./dados/conhecimento_fitness.txt
 
 RUN mkdir -p /app/data/chroma_db /app/outputs /root/.cache/huggingface

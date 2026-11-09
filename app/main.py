@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from app.agent.graph import DEFAULT_RECURSION_LIMIT
+from app.agent.plan_output import parse_and_validate_plan, render_plan_markdown
 from app.agent.prompts import build_plan_prompt
 from app.config.settings import Settings
 from app.rag.ingestion import resolve_project_path
@@ -21,7 +22,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weight-kg", type=float, required=True)
     parser.add_argument("--height-cm", type=float, required=True)
     parser.add_argument("--gender", choices=("male", "female"), required=True)
-    parser.add_argument("--frequency", type=int, required=True, help="Training days per week (0-7).")
+    parser.add_argument("--frequency", type=int, required=True, help="Training days per week (1-7).")
     parser.add_argument("--goal", required=True, help="For example: hipertrofia, emagrecimento, or manutenção.")
     parser.add_argument("--output", default="outputs/plano_de_treino_final.md")
     return parser
@@ -29,6 +30,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
 def validate_profile(args: argparse.Namespace) -> dict[str, object]:
     """Validate the CLI profile through the same deterministic calculation contract."""
+    if isinstance(args.frequency, bool) or not isinstance(args.frequency, int) or not 1 <= args.frequency <= 7:
+        raise ValueError("frequency must be an integer between 1 and 7 for a training plan")
     calculate_fitness_metrics(
         age_years=args.age,
         weight_kg=args.weight_kg,
@@ -57,9 +60,13 @@ def run_plan_generation(profile: dict[str, object], graph, output_path: str | Pa
     messages = result.get("messages", [])
     if not messages:
         raise RuntimeError("Agent completed without returning any messages")
-    content = getattr(messages[-1], "content", None)
-    if not isinstance(content, str) or not content.strip():
-        raise RuntimeError("Agent returned an empty or unsupported final response")
+    raw_content = getattr(messages[-1], "content", None)
+    try:
+        plan = parse_and_validate_plan(raw_content, sessions_per_week=int(profile["frequency"]))
+    except (TypeError, ValueError) as exc:
+        logger.error("Generated plan failed output validation: %s", exc)
+        raise RuntimeError(f"Generated plan did not satisfy the output contract: {exc}") from exc
+    content = render_plan_markdown(plan)
 
     destination = resolve_project_path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)

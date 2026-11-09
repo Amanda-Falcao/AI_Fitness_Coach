@@ -21,7 +21,9 @@
 
 The deterministic pytest suite covers calculation boundaries, settings, prompt/CLI behavior, graph routing, RAG contracts, and tool adapter behavior with test doubles. It does not call paid or network services. These are software contract tests, not a measurement of generated-plan quality.
 
-LLM quality evaluation remains a follow-up: retrieval relevance needs a small reviewed query/evidence set, and answer faithfulness, sufficiency, and consistency need a qualitative rubric or an explicitly calibrated evaluator. Latency and token/cost telemetry also require provider response metadata and should be measured separately from correctness. No evaluation framework is added until a concrete evaluation protocol justifies it.
+`app/rag/evaluation.py` runs a small, reviewed exact-evidence benchmark from `evaluation/retrieval_cases.json` and reports hit-rate@k, MRR, and mean retrieval latency. It is deterministic and framework-free. Exact snippet matching is a regression signal, not a semantic relevance or answer-faithfulness judgment. Generated answer faithfulness, sufficiency, and consistency still need a qualitative rubric or a separately calibrated evaluator. Model token usage/cost also requires provider response metadata and should be measured separately from correctness.
+
+The observed five-query Docker baseline and measurement boundaries are recorded in [evaluation.md](evaluation.md).
 
 ## RAG ingestion flow
 
@@ -45,7 +47,8 @@ flowchart TD
     B --> C{Tool calls?}
     C -- Yes --> D[LangGraph ToolNode]
     D --> B
-    C -- No --> E[Final plan]
+    C -- No --> E[JSON contract validation]
+    E --> F[Markdown renderer and file]
     B -. uses .-> F[Shared calculation tool]
     B -. uses .-> G[Chroma retriever, top-k 3]
     B -. uses .-> H[Tavily web search]
@@ -53,14 +56,14 @@ flowchart TD
 
 The graph is built by `app/agent/graph.py`; the notebook invokes the compiled app. The flow uses the append-only message reducer, routes tool requests through LangGraph's `ToolNode`, and returns to the model after tool execution. The notebook sets a recursion limit of 12 graph steps so a tool loop terminates with a LangGraph limit error instead of running indefinitely. When the RAG tool runs, the retriever embeds the query with the configured Hugging Face model, searches the existing Chroma collection, and returns up to three relevant chunks to the model. A missing or empty collection raises an explicit error instead of returning a tool result that resembles useful evidence.
 
-The command-line entry point accepts profile arguments, validates them with the deterministic calculation contract, builds the runtime from environment settings, invokes the graph, and saves the final Markdown response. API clients are created only when the runtime is built, not when modules are imported.
+The command-line entry point accepts profile arguments, validates them with the deterministic calculation contract, builds the runtime from environment settings, invokes the graph, parses and validates its strict JSON response in `app/agent/plan_output.py`, renders Markdown deterministically, and saves only a valid plan. The output contract checks three ordered weeks, the requested session count, unique training days per week, bounded exercise parameters, and required safety fields. It enforces structure and presence only; it cannot certify medical suitability or that exercise advice is factually safe. API clients are created only when the runtime is built, not when modules are imported.
 
 ## Current boundaries and limitations
 
 - The standalone entry point is a command-line interface; no HTTP service is included.
 - The RAG pipeline does not yet expose scores or citations in the generated answer.
 - Existing chunks whose historical source metadata differs from `dados/conhecimento_fitness.txt` are not automatically removed by the new ingestion flow.
-- Retrieval settings remain at the prototype values pending a small, reviewed retrieval evaluation set.
+- Retrieval settings remain at the prototype values until the included benchmark has been run and its relevance limitations reviewed.
 
 ## Container setup
 

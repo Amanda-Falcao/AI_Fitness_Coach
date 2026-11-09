@@ -1,0 +1,22 @@
+[
+  {
+    "query": "Como aplicar sobrecarga progressiva para hipertrofia?",
+    "expected_evidence": "Aumentar a carga (peso)"
+  },
+  {
+    "query": "Quantas repetições devo deixar em reserva para hipertrofia?",
+    "expected_evidence": "Treinar até 1 ou 2 repetições da falha (RIR 1-2)"
+  },
+  {
+    "query": "Qual divisão de musculação é recomendada para quatro dias por semana?",
+    "expected_evidence": "Upper/Lower (A, B, A, B)"
+  },
+  {
+    "query": "Qual cuidado técnico no supino reto protege os ombros?",
+    "expected_evidence": "Retrair as escápulas"
+  },
+  {
+    "query": "Quanto descansar entre séries de força máxima?",
+    "expected_evidence": "Descanso: 3 a 5 minutos"
+  }
+]
