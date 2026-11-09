@@ -21,6 +21,8 @@ One real run against the Docker Compose Chroma volume, after ingesting the curre
 
 This is a small prototype baseline, not a general quality or production latency claim. Exact evidence matching does not measure semantic relevance beyond the selected snippets, answer faithfulness, safety, plan usefulness, or LLM generation latency/cost. Latency depends on hardware and warm state.
 
+For human review of generated plans, use [`evaluation/plan_review_template.md`](../evaluation/plan_review_template.md). The rubric records evidence, citation accuracy, internal consistency, safety communication, uncertainty behavior, and readability without adding an LLM-judge dependency.
+
 ## Re-run
 
 ```bash

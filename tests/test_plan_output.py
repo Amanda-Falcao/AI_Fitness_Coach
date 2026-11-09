@@ -26,6 +26,7 @@ def valid_plan(sessions_per_week=2):
                                 "reps": "8-12",
                                 "rest_seconds": 90,
                                 "technique_cues": ["Mantenha a coluna neutra."],
+                                "evidence_refs": ["KB-aaaaaaaaaaaa"],
                             }
                         ],
                     }
@@ -43,14 +44,26 @@ def valid_plan(sessions_per_week=2):
     }
 
 
-def test_validates_exact_weekly_session_count_and_renders_markdown():
-    plan = parse_and_validate_plan(json.dumps(valid_plan()), sessions_per_week=2)
+VALID_CITATIONS = {
+    "KB-aaaaaaaaaaaa": {
+        "source": "guide.txt",
+        "evidence": "Agachamento: mantenha a coluna neutra.",
+    }
+}
 
-    markdown = render_plan_markdown(plan)
+
+def test_validates_exact_weekly_session_count_and_renders_markdown():
+    plan = parse_and_validate_plan(
+        json.dumps(valid_plan()), sessions_per_week=2, citation_registry=VALID_CITATIONS
+    )
+
+    markdown = render_plan_markdown(plan, VALID_CITATIONS)
     assert markdown.startswith("# Plano de três semanas")
     assert markdown.count("### Sessão") == 6
     assert "## Segurança" in markdown
     assert "Procure profissional" in markdown
+    assert "guide.txt" in markdown
+    assert "[KB-aaaaaaaaaaaa]" in markdown
 
 
 def test_rejects_invalid_json_and_markdown_fences():
@@ -64,7 +77,7 @@ def test_rejects_incomplete_weeks_and_wrong_session_count():
     plan["weeks"][1]["sessions"].pop()
 
     with pytest.raises(PlanValidationError, match="exactly 2 sessions"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
 def test_rejects_unsafe_or_invalid_exercise_parameters():
@@ -72,7 +85,7 @@ def test_rejects_unsafe_or_invalid_exercise_parameters():
     plan["weeks"][0]["sessions"][0]["exercises"][0]["sets"] = 0
 
     with pytest.raises(PlanValidationError, match="sets must be an integer"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
 def test_rejects_missing_safety_guidance():
@@ -80,7 +93,7 @@ def test_rejects_missing_safety_guidance():
     plan["safety"]["stop_conditions"] = []
 
     with pytest.raises(PlanValidationError, match="stop_conditions"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
 def test_rejects_duplicate_days_in_a_week():
@@ -88,7 +101,7 @@ def test_rejects_duplicate_days_in_a_week():
     plan["weeks"][0]["sessions"][1]["day"] = 1
 
     with pytest.raises(PlanValidationError, match="repeats a training day"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
 def test_rejects_unexpected_fields_and_boolean_week_numbers():
@@ -96,9 +109,17 @@ def test_rejects_unexpected_fields_and_boolean_week_numbers():
     plan["weeks"][0]["week"] = True
 
     with pytest.raises(PlanValidationError, match="integer between"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
     plan = valid_plan()
     plan["unexpected"] = "field"
     with pytest.raises(PlanValidationError, match="unexpected: unexpected"):
-        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2)
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
+
+
+def test_rejects_reference_not_returned_by_rag_tool():
+    plan = valid_plan()
+    plan["weeks"][0]["sessions"][0]["exercises"][0]["evidence_refs"] = ["KB-bbbbbbbbbbbb"]
+
+    with pytest.raises(PlanValidationError, match="not returned by the RAG tool"):
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)

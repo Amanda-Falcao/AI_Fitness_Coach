@@ -1,7 +1,11 @@
 """Validate the agent's JSON plan contract and render it as readable Markdown."""
 
 import json
+import re
 from typing import Any
+
+
+_REFERENCE_PATTERN = re.compile(r"^KB-[0-9a-f]{12}$")
 
 
 class PlanValidationError(ValueError):
@@ -35,9 +39,15 @@ def _require_keys(value: Any, expected: set[str], field: str) -> None:
         raise PlanValidationError(f"{field} has an invalid shape ({'; '.join(details)})")
 
 
-def parse_and_validate_plan(raw_content: str, *, sessions_per_week: int) -> dict[str, Any]:
+def parse_and_validate_plan(
+    raw_content: str,
+    *,
+    sessions_per_week: int,
+    citation_registry: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
     """Parse JSON and validate completeness, exercise fields, and safety content."""
     _require_integer(sessions_per_week, "sessions_per_week", 1, 7)
+    citation_registry = citation_registry or {}
     if not isinstance(raw_content, str) or not raw_content.strip():
         raise PlanValidationError("Agent response must be non-empty JSON")
     try:
@@ -77,7 +87,7 @@ def parse_and_validate_plan(raw_content: str, *, sessions_per_week: int) -> dict
                 exercise_label = f"{label} exercise {exercise_index}"
                 _require_keys(
                     exercise,
-                    {"name", "sets", "reps", "rest_seconds", "technique_cues"},
+                    {"name", "sets", "reps", "rest_seconds", "technique_cues", "evidence_refs"},
                     exercise_label,
                 )
                 _require_text(exercise.get("name"), f"{exercise_label}.name", max_length=120)
@@ -89,6 +99,16 @@ def parse_and_validate_plan(raw_content: str, *, sessions_per_week: int) -> dict
                     raise PlanValidationError(f"{exercise_label}.technique_cues must contain one or two cues")
                 for cue_index, cue in enumerate(cues, start=1):
                     _require_text(cue, f"{exercise_label}.technique_cues[{cue_index}]", max_length=240)
+                references = exercise.get("evidence_refs")
+                if not isinstance(references, list) or not 1 <= len(references) <= 3:
+                    raise PlanValidationError(f"{exercise_label}.evidence_refs must contain one to three citations")
+                for reference in references:
+                    if not isinstance(reference, str) or not _REFERENCE_PATTERN.fullmatch(reference):
+                        raise PlanValidationError(f"{exercise_label} contains an invalid citation ID")
+                    if reference not in citation_registry:
+                        raise PlanValidationError(
+                            f"{exercise_label} cites evidence that was not returned by the RAG tool: {reference}"
+                        )
 
     _require_text(plan.get("coach_analysis"), "coach_analysis", max_length=4000)
     safety = plan.get("safety")
@@ -103,7 +123,9 @@ def parse_and_validate_plan(raw_content: str, *, sessions_per_week: int) -> dict
     return plan
 
 
-def render_plan_markdown(plan: dict[str, Any]) -> str:
+def render_plan_markdown(
+    plan: dict[str, Any], citation_registry: dict[str, dict[str, str]]
+) -> str:
     """Render a validated plan deterministically for the CLI and notebook."""
     lines = [f"# {plan['title']}", ""]
     for week in plan["weeks"]:
@@ -114,12 +136,27 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
                 rest = exercise["rest_seconds"]
                 lines.append(
                     f"- **{exercise['name']}** — {exercise['sets']} séries × {exercise['reps']} "
-                    f"(descanso: {rest}s)"
+                    f"(descanso: {rest}s) — Evidência: {', '.join(exercise['evidence_refs'])}"
                 )
                 lines.extend(f"  - Técnica: {cue}" for cue in exercise["technique_cues"])
             lines.append("")
 
-    lines.extend(["## Análise do Coach e Estratégia", "", plan["coach_analysis"], "", "## Segurança", ""])
+    lines.extend(["## Fontes da base de conhecimento", ""])
+    used_references = {
+        reference
+        for week in plan["weeks"]
+        for session in week["sessions"]
+        for exercise in session["exercises"]
+        for reference in exercise["evidence_refs"]
+    }
+    for reference in sorted(used_references):
+        citation = citation_registry[reference]
+        evidence = citation["evidence"].replace("\n", " ").strip()
+        if len(evidence) > 360:
+            evidence = evidence[:357].rstrip() + "..."
+        lines.append(f"- **[{reference}]** `{citation['source']}` — {evidence}")
+
+    lines.extend(["", "## Análise do Coach e Estratégia", "", plan["coach_analysis"], "", "## Segurança", ""])
     lines.extend([f"- {plan['safety']['disclaimer']}", "", "**Pare se:**"])
     lines.extend(f"- {condition}" for condition in plan["safety"]["stop_conditions"])
     lines.extend(["", "**Procure orientação profissional se:**"])

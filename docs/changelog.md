@@ -18,14 +18,21 @@
 - **Created:** `app/agent/plan_output.py` for strict JSON contract validation and deterministic Markdown rendering, plus `tests/test_plan_output.py` for schema, completeness, bounds, and safety-field checks.
 - **Modified:** `app/agent/prompts.py` to require the structured Portuguese plan and conservative safety guidance; `app/main.py` to reject invalid content before writing output.
 - **Modified:** `02_Agente_Treinador_Fitness.ipynb` to use the shared prompt, validation, and Markdown renderer instead of its separate prompt and unvalidated output path.
+- **Created:** `app/rag/citations.py` to build trusted citation registries from internal RAG tool messages; the RAG adapter now returns stable content-derived IDs with source and evidence.
+- **Modified:** the RAG tool to fail when a retrieved passage lacks source metadata, and the prompt to treat retrieved/web content as untrusted reference data rather than instructions.
+- **Modified:** the structured plan contract to require per-exercise RAG references, validate reference membership, and render source paths and retrieved excerpts from trusted tool records.
+- **Created:** `.github/workflows/ci.yml` for Python tests and notebook syntax checks, and `evaluation/plan_review_template.md` for manual plan-quality review.
+- **Created:** `app/observability.py` for allowlisted JSON logs and token usage aggregation; CLI runs now report duration, selected model, session count, token counts if supplied, and safe error type without logging prompt/profile contents.
+- **Modified:** GitHub Actions to use the current major releases of the official checkout and setup-python actions, verified against their upstream release pages.
 - **Problems addressed:** duplicated calculation logic, notebook-only execution, missing profile/config validation, implicit RAG setup and IDs, unbounded tool cycles, unclear missing/empty knowledge-base errors, and lack of isolated dependency installation.
 - **Output contract:** generated plans must contain exactly three ordered weeks, the requested sessions each week, bounded exercise fields, and explicit safety guidance. Validation is structural, not a medical-safety guarantee.
+- **Citation contract:** each exercise must refer to an ID emitted by the RAG tool in that graph run; displayed source/evidence is resolved from the tool result, though semantic entailment is not checked.
 - **Container decision:** runtime installs CPU-only PyTorch rather than pulling CUDA libraries; the test image installs only pytest and application source/tests.
 - **Integration compatibility finding:** the initial smoke test found a legacy `langchain.tools.retriever` import absent from the resolved LangChain release. The application now implements the retrieval tool explicitly with the supported core `@tool` decorator and uses standalone Chroma/Hugging Face integration packages.
 
 ### Validation performed
 
-- `docker build --target test -t ai-fitness-coach:test -f Dockerfile .` — **48 passed** in the isolated test image.
+- `docker build --target test -t ai-fitness-coach:test -f Dockerfile .` — **57 passed** in the isolated test image.
 - `docker compose -f compose.yaml config --quiet` — passed.
 - Runtime image build — passed.
 - Runtime import smoke check — passed for LangGraph, LangChain core/Groq, standalone Chroma/Hugging Face/text-splitter integrations, Tavily, runtime composition, and RAG tool modules.
@@ -35,4 +42,6 @@
 - `python -m app.main --help` in the runtime image — passed and displayed the expected CLI arguments.
 - Updated notebook JSON and execution cell syntax validation — passed.
 - Invalid plan output test — confirmed the CLI does not create the destination file when the output contract fails.
+- CI commands (pytest and notebook JSON/code syntax) were exercised locally in the container-equivalent environment; the hosted GitHub Actions run has not occurred from this workspace.
+- Real LangChain `@tool` + LangGraph tool-cycle smoke with a fake retriever/model — passed; citation IDs resolved to the returned source/evidence and rendered into Markdown.
 - No live Groq or Tavily call and no full plan generation was performed; these require valid user credentials and incur external service usage. Embedding model download, ingestion, and retrieval evaluation were run in the Compose container.

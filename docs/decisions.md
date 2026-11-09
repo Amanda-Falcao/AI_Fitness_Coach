@@ -99,3 +99,33 @@
 - **Technical rationale:** JSON parsing and explicit checks are deterministic, dependency-free, easy to test, and keep presentation separate from model generation. Failing closed prevents malformed plans from being mistaken for successful files.
 - **Expected benefits:** Predictable output shape, exact session-count enforcement, stable Markdown formatting, and required safety disclaimer/stop/referral fields.
 - **Trade-offs and limitations:** The model may fail the contract, in which case the CLI stops without saving; no automatic repair call is made to avoid hidden extra cost and latency. Structural safety fields do not establish factual or medical safety, and content still requires human review.
+
+## ADR-011 — Bind exercise citations to actual RAG tool results
+
+- **Status:** Accepted
+- **Context:** Structured plans required evidence fields, but free-form citations could still name nonexistent sources or fabricate source metadata.
+- **Decision:** The RAG tool returns JSON records with deterministic `KB-...` IDs, source paths, and retrieved text. Each exercise must select one to three IDs. The application builds a citation registry only from internal RAG tool messages, rejects unknown IDs, and renders source/excerpts from that registry rather than trusting model-supplied metadata.
+- **Alternatives considered:** Ask the LLM to write source names directly; attach every retrieved chunk to the final plan; add a citation management framework.
+- **Technical rationale:** Stable IDs provide traceability with no new dependency, and membership validation prevents fabricated references from being displayed as retrieved evidence.
+- **Expected benefits:** Reviewers can trace each exercise to an actual passage returned during the run; invalid or invented citation IDs fail output validation.
+- **Trade-offs and limitations:** Membership proves provenance, not entailment. A model may cite a real passage that does not support a claim. Chunk text is a weak citation boundary and citations are not linked to source line numbers. Prompt text marks retrieved/web content as untrusted reference data, but this does not replace a full prompt-injection defense.
+
+## ADR-012 — Run deterministic checks in GitHub Actions
+
+- **Status:** Accepted
+- **Context:** Tests had only been run manually in a Docker test target, so later changes could regress without a consistent repository check.
+- **Decision:** Add a GitHub Actions workflow for pushes and pull requests that installs only `requirements-test.txt`, runs pytest on Python 3.12, and parses notebook JSON and Python code cells.
+- **Alternatives considered:** Build the full runtime image on every pull request; add a CI framework or linter dependency; rely on local Docker commands.
+- **Technical rationale:** The current tests are pure Python and offline, so CI stays fast and does not need secrets, model downloads, or API calls.
+- **Expected benefits:** Automated regression checks with no external-service cost and early detection of notebook syntax errors.
+- **Trade-offs and limitations:** The workflow has not run on GitHub from this workspace. It does not build the full dependency-heavy runtime image or perform live integration checks.
+
+## ADR-013 — Emit allowlisted JSON operational logs and provider token usage
+
+- **Status:** Accepted
+- **Context:** Generation had no consistent timing or usage telemetry, but logging prompts, profiles, retrieved evidence, or credentials would create avoidable privacy and secret exposure.
+- **Decision:** Use standard-library JSON logs with an allowlist of event, elapsed time, session count, configured model name, output path, error type, and provider token counts when available. Do not estimate cost without an explicit pricing source/configuration.
+- **Alternatives considered:** Add an observability SDK; log full inputs/outputs for debugging; estimate price from hardcoded provider rates.
+- **Technical rationale:** Minimal structured logs are machine-readable and sufficient to observe local latency and token metadata without introducing a dependency or retaining user content.
+- **Expected benefits:** Comparable run timing, optional token visibility, and logs that omit request/profile/evidence content by construction.
+- **Trade-offs and limitations:** Provider metadata may be absent; tokens are not currency cost. Logs are local stdout only, with no aggregation, trace IDs, or dashboards. Retries remain intentionally unconfigured to avoid duplicating potentially billable calls without an explicit policy.

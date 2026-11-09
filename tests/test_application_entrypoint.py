@@ -1,5 +1,6 @@
 from argparse import Namespace
 import json
+from hashlib import sha256
 from types import SimpleNamespace
 
 import pytest
@@ -16,6 +17,8 @@ VALID_ARGS = Namespace(
     frequency=5,
     goal="hipertrofia",
 )
+EVIDENCE_TEXT = "Agachamento livre melhora força em quadríceps e glúteos."
+EVIDENCE_REF = "KB-" + sha256(f"dados/conhecimento_fitness.txt\0{EVIDENCE_TEXT}".encode("utf-8")).hexdigest()[:12]
 
 
 def valid_plan_content(sessions_per_week=5):
@@ -34,6 +37,7 @@ def valid_plan_content(sessions_per_week=5):
                             "reps": "8-12",
                             "rest_seconds": 90,
                             "technique_cues": ["Mantenha a coluna neutra."],
+                            "evidence_refs": [EVIDENCE_REF],
                         }],
                     }
                     for day in range(1, sessions_per_week + 1)
@@ -89,7 +93,15 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
         def invoke(self, state, config):
             assert state["messages"][0]["role"] == "user"
             assert config["recursion_limit"] == 12
-            return {"messages": [SimpleNamespace(content=valid_plan_content())]}
+            rag_result = json.dumps([{
+                "ref_id": EVIDENCE_REF,
+                "source": "dados/conhecimento_fitness.txt",
+                "evidence": EVIDENCE_TEXT,
+            }], ensure_ascii=False)
+            return {"messages": [
+                SimpleNamespace(name="fitness_knowledge_base_search", content=rag_result),
+                SimpleNamespace(content=valid_plan_content()),
+            ]}
 
     output = run_plan_generation(
         {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"},
@@ -99,6 +111,8 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
 
     assert output.read_text(encoding="utf-8").startswith("# Plano de três semanas\n")
     assert output.read_text(encoding="utf-8").count("### Sessão") == 15
+    assert EVIDENCE_REF in output.read_text(encoding="utf-8")
+    assert "dados/conhecimento_fitness.txt" in output.read_text(encoding="utf-8")
 
 
 def test_run_plan_generation_does_not_write_invalid_output(tmp_path):

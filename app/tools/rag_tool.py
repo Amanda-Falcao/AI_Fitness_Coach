@@ -1,5 +1,7 @@
 """LangChain adapter for the internal fitness knowledge retriever."""
 
+import hashlib
+import json
 from pathlib import Path
 
 from app.rag.retriever import create_fitness_retriever
@@ -26,9 +28,21 @@ def create_rag_tool(*, persist_directory: str | Path | None = None, k: int = 3):
         documents = retriever.invoke(query.strip())
         if not documents:
             return "No relevant knowledge documents were found."
-        return "\n\n".join(
-            f"Source: {document.metadata.get('source', 'unknown')}\n{document.page_content}"
-            for document in documents
-        )
+        records = []
+        for document in documents:
+            source = document.metadata.get("source")
+            if not isinstance(source, str) or not source.strip():
+                raise RuntimeError("Retrieved knowledge chunk is missing source metadata")
+            fingerprint = hashlib.sha256(
+                f"{source.strip()}\0{document.page_content}".encode("utf-8")
+            ).hexdigest()[:12]
+            records.append(
+                {
+                    "ref_id": f"KB-{fingerprint}",
+                    "source": source.strip(),
+                    "evidence": document.page_content,
+                }
+            )
+        return json.dumps(records, ensure_ascii=False)
 
     return fitness_knowledge_base_search

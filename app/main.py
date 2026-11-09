@@ -3,11 +3,14 @@
 import argparse
 import logging
 from pathlib import Path
+import time
 
 from app.agent.graph import DEFAULT_RECURSION_LIMIT
 from app.agent.plan_output import parse_and_validate_plan, render_plan_markdown
 from app.agent.prompts import build_plan_prompt
 from app.config.settings import Settings
+from app.observability import aggregate_token_usage, configure_json_logging
+from app.rag.citations import citation_registry_from_messages
 from app.rag.ingestion import resolve_project_path
 from app.runtime import build_agent_application
 from app.tools.calculations import calculate_fitness_metrics
@@ -50,33 +53,64 @@ def validate_profile(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
-def run_plan_generation(profile: dict[str, object], graph, output_path: str | Path) -> Path:
+def run_plan_generation(
+    profile: dict[str, object], graph, output_path: str | Path, *, model_name: str | None = None
+) -> Path:
     """Invoke an injected graph and save its final response as Markdown."""
+    started_at = time.perf_counter()
     prompt = build_plan_prompt(profile)
-    result = graph.invoke(
-        {"messages": [{"role": "user", "content": prompt}]},
-        config={"recursion_limit": DEFAULT_RECURSION_LIMIT},
-    )
+    try:
+        result = graph.invoke(
+            {"messages": [{"role": "user", "content": prompt}]},
+            config={"recursion_limit": DEFAULT_RECURSION_LIMIT},
+        )
+    except Exception as exc:
+        logger.error(
+            "Agent invocation failed",
+            extra={
+                "event": "agent.plan_generation_failed",
+                "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                "error_type": type(exc).__name__,
+            },
+        )
+        raise RuntimeError(
+            f"Agent invocation failed ({type(exc).__name__}); check service availability and configuration"
+        ) from None
     messages = result.get("messages", [])
     if not messages:
         raise RuntimeError("Agent completed without returning any messages")
     raw_content = getattr(messages[-1], "content", None)
     try:
-        plan = parse_and_validate_plan(raw_content, sessions_per_week=int(profile["frequency"]))
+        citation_registry = citation_registry_from_messages(messages)
+        plan = parse_and_validate_plan(
+            raw_content,
+            sessions_per_week=int(profile["frequency"]),
+            citation_registry=citation_registry,
+        )
     except (TypeError, ValueError) as exc:
         logger.error("Generated plan failed output validation: %s", exc)
         raise RuntimeError(f"Generated plan did not satisfy the output contract: {exc}") from exc
-    content = render_plan_markdown(plan)
+    content = render_plan_markdown(plan, citation_registry)
 
     destination = resolve_project_path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(content, encoding="utf-8")
-    logger.info("Training plan saved to %s", destination)
+    logger.info(
+        "Training plan generated and saved",
+        extra={
+            "event": "agent.plan_generation_completed",
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+            "session_count": int(profile["frequency"]) * 3,
+            "model_name": model_name,
+            "token_usage": aggregate_token_usage(messages),
+            "output_path": str(destination),
+        },
+    )
     return destination
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    configure_json_logging()
     try:
         from dotenv import load_dotenv
     except ImportError as exc:
@@ -88,7 +122,9 @@ def main() -> None:
     profile = validate_profile(args)
     settings = Settings.from_env(require_groq=True, require_tavily=True)
     graph = build_agent_application(settings)
-    destination = run_plan_generation(profile, graph, args.output)
+    destination = run_plan_generation(
+        profile, graph, args.output, model_name=settings.groq_model_name
+    )
     print(f"Training plan saved to {destination}")
 
 

@@ -1,3 +1,5 @@
+import json
+import re
 import sys
 from types import ModuleType, SimpleNamespace
 
@@ -52,8 +54,10 @@ def test_rag_tool_returns_source_and_rejects_blank_queries(monkeypatch):
     monkeypatch.setattr(rag_tool, "create_fitness_retriever", lambda **kwargs: FakeRetriever())
     tool = rag_tool.create_rag_tool()
 
-    assert "Source: guide.txt" in tool("  squat technique  ")
-    assert "neutral spine" in tool("squat technique")
+    records = json.loads(tool("  squat technique  "))
+    assert records[0]["source"] == "guide.txt"
+    assert records[0]["evidence"] == "Keep a neutral spine."
+    assert re.fullmatch(r"KB-[0-9a-f]{12}", records[0]["ref_id"])
     with pytest.raises(ValueError, match="non-empty"):
         tool("  ")
 
@@ -68,6 +72,19 @@ def test_rag_tool_reports_no_matching_documents(monkeypatch):
 
     monkeypatch.setattr(rag_tool, "create_fitness_retriever", lambda **kwargs: EmptyRetriever())
     assert rag_tool.create_rag_tool()("unknown topic") == "No relevant knowledge documents were found."
+
+
+def test_rag_tool_rejects_documents_without_source_metadata(monkeypatch):
+    install_fake_langchain_tool(monkeypatch)
+    from app.tools import rag_tool
+
+    class MissingSourceRetriever:
+        def invoke(self, query):
+            return [SimpleNamespace(metadata={}, page_content="An uncited passage.")]
+
+    monkeypatch.setattr(rag_tool, "create_fitness_retriever", lambda **kwargs: MissingSourceRetriever())
+    with pytest.raises(RuntimeError, match="missing source metadata"):
+        rag_tool.create_rag_tool()("exercise")
 
 
 def test_tavily_tool_uses_client_and_surfaces_safe_error(monkeypatch):
