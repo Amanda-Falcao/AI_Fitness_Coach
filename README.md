@@ -51,6 +51,8 @@ TAVILY_API_KEY=sua_chave_tavily
 
 As configurações opcionais são `CHROMA_PERSIST_DIRECTORY`, `EMBEDDING_MODEL_NAME` e `GROQ_MODEL_NAME`. Mantenha `.env` privado: ele é excluído do Git e do contexto de build do Docker.
 
+O modelo padrão é `openai/gpt-oss-20b`, substituto recomendado pelo Groq após a desativação de `llama-3.1-8b-instant`. Para evitar cobranças, use a conta no Free Plan e confira o nível e os limites de uso no painel antes de gerar planos. Os limites e modelos disponíveis podem mudar; o plano Developer é pago conforme o uso. Consulte a [política de descontinuação de modelos](https://console.groq.com/docs/deprecations) e as [informações oficiais de faturamento](https://console.groq.com/docs/billing-faqs).
+
 ## Compilar e executar com Docker Compose
 
 Compile a imagem de execução:

@@ -14,7 +14,7 @@ class Settings:
     tavily_api_key: str | None = None
     chroma_persist_directory: str = "dados/chroma_db"
     embedding_model_name: str = "all-MiniLM-L6-v2"
-    groq_model_name: str = "llama-3.1-8b-instant"
+    groq_model_name: str = "openai/gpt-oss-20b"
 
     @classmethod
     def from_env(cls, *, require_groq: bool = False, require_tavily: bool = False) -> "Settings":
@@ -31,7 +31,7 @@ class Settings:
 
         chroma_path = os.getenv("CHROMA_PERSIST_DIRECTORY", "dados/chroma_db").strip()
         embedding_model = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2").strip()
-        groq_model = os.getenv("GROQ_MODEL_NAME", "llama-3.1-8b-instant").strip()
+        groq_model = os.getenv("GROQ_MODEL_NAME", "openai/gpt-oss-20b").strip()
         empty_settings = [
             name
             for name, value in (

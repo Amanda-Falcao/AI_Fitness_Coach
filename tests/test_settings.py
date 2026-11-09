@@ -13,6 +13,7 @@ def test_settings_use_safe_defaults_without_loading_secrets(monkeypatch):
     assert settings.groq_api_key is None
     assert settings.tavily_api_key is None
     assert settings.chroma_persist_directory == "dados/chroma_db"
+    assert settings.groq_model_name == "openai/gpt-oss-20b"
 
 
 def test_settings_require_only_requested_integrations(monkeypatch):

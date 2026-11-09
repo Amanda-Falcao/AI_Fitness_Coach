@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-09 — Migração do modelo Groq descontinuado
+
+- **Problema observado:** a geração real de plano recebeu HTTP 404 porque o padrão `llama-3.1-8b-instant` havia sido desativado pelo Groq em 16/08/2026.
+- **Alterado:** padrão de `GROQ_MODEL_NAME` para `openai/gpt-oss-20b` em `app/config/settings.py` e `.env.example`, recomendado pelo Groq como substituto.
+- **Teste:** coberta a seleção do modelo padrão em `tests/test_settings.py`.
+- **Limitação de validação:** nenhuma nova chamada real à API foi feita nesta alteração. O próximo smoke test deve ser executado somente com a conta no Free Plan e dentro dos limites exibidos pelo Groq.
+- **Resultados compartilhados pela usuária antes da migração:** 57 testes aprovados; ingestão de 5 chunks concluída; benchmark RAG com hit-rate@3 de 1.0, MRR de 0.9 e latência média observada de 9.66 ms em 5 consultas; CLI `--help` concluída. A geração foi a única etapa que falhou, com HTTP 404.
+
 ## Unreleased — Application modularization and container runtime
 
 - **Created:** `app/config/settings.py`, `app/tools/calculations.py`, `app/agent/`, `app/rag/`, `app/tools/`, `app/runtime.py`, and `app/main.py` to separate configuration, deterministic calculations, graph logic, RAG, integrations, and execution.
