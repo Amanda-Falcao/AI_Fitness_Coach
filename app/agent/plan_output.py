@@ -12,6 +12,93 @@ class PlanValidationError(ValueError):
     """Raised when an LLM response does not satisfy the training plan contract."""
 
 
+def groq_plan_response_format(sessions_per_week: int) -> dict[str, Any]:
+    """Return a flat strict schema with a required slot for every plan session."""
+    _require_integer(sessions_per_week, "sessions_per_week", 1, 7)
+
+    def closed_object(properties: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": list(properties),
+            "additionalProperties": False,
+        }
+
+    text = {"type": "string"}
+    exercise = closed_object({
+        "name": text,
+        "sets": {"type": "integer"},
+        "reps": text,
+        "rest_seconds": {"type": "integer"},
+        "technique_cue": text,
+        "evidence_ref": text,
+    })
+    session = closed_object({
+        "day": {"type": "integer"},
+        "title": text,
+        **{f"exercise_{index}": exercise for index in range(1, 4)},
+    })
+    safety = closed_object({
+        "disclaimer": text,
+        "stop_conditions": {"type": "array", "items": text},
+        "seek_professional_if": {"type": "array", "items": text},
+    })
+    schema = closed_object({
+        "title": text,
+        **{
+            f"week_{week}_session_{session_number}": session
+            for week in range(1, 4)
+            for session_number in range(1, sessions_per_week + 1)
+        },
+        "coach_analysis": text,
+        "safety": safety,
+    })
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "fitness_training_plan",
+            "strict": True,
+            "schema": schema,
+        },
+    }
+
+
+def normalize_groq_plan(raw_content: str, sessions_per_week: int) -> str:
+    """Convert flat strict-schema session slots into the stable list-based contract."""
+    _require_integer(sessions_per_week, "sessions_per_week", 1, 7)
+    try:
+        plan = json.loads(raw_content)
+        if isinstance(plan.get("weeks"), list):
+            return json.dumps(plan, ensure_ascii=False)
+        weeks = []
+        for week_number in range(1, 4):
+            sessions = []
+            for session_number in range(1, sessions_per_week + 1):
+                slot_name = f"week_{week_number}_session_{session_number}"
+                session = plan.pop(slot_name)
+                exercises = []
+                for exercise_number in range(1, 4):
+                    exercise = session.pop(f"exercise_{exercise_number}")
+                    exercises.append({
+                        "name": exercise["name"],
+                        "sets": exercise["sets"],
+                        "reps": exercise["reps"],
+                        "rest_seconds": exercise["rest_seconds"],
+                        "technique_cues": [exercise["technique_cue"]],
+                        "evidence_refs": [exercise["evidence_ref"]],
+                    })
+                sessions.append({
+                    "day": session["day"],
+                    "title": session["title"],
+                    "exercises": exercises,
+                })
+            weeks.append({"week": week_number, "sessions": sessions})
+        plan["weeks"] = weeks
+        return json.dumps(plan, ensure_ascii=False)
+    except (AttributeError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise PlanValidationError("Agent response does not match the numbered plan schema") from exc
+
+
 def _require_text(value: Any, field: str, *, max_length: int = 2000) -> str:
     if not isinstance(value, str) or not value.strip() or len(value) > max_length:
         raise PlanValidationError(f"{field} must be a non-empty string up to {max_length} characters")
@@ -81,8 +168,8 @@ def parse_and_validate_plan(
             days.add(day)
             _require_text(session.get("title"), f"{label}.title", max_length=160)
             exercises = session.get("exercises")
-            if not isinstance(exercises, list) or not 1 <= len(exercises) <= 12:
-                raise PlanValidationError(f"{label} must contain between 1 and 12 exercises")
+            if not isinstance(exercises, list) or len(exercises) != 3:
+                raise PlanValidationError(f"{label} must contain exactly 3 exercises")
             for exercise_index, exercise in enumerate(exercises, start=1):
                 exercise_label = f"{label} exercise {exercise_index}"
                 _require_keys(

@@ -8,6 +8,40 @@
 - **Limitação de validação:** nenhuma nova chamada real à API foi feita nesta alteração. O próximo smoke test deve ser executado somente com a conta no Free Plan e dentro dos limites exibidos pelo Groq.
 - **Resultados compartilhados pela usuária antes da migração:** 57 testes aprovados; ingestão de 5 chunks concluída; benchmark RAG com hit-rate@3 de 1.0, MRR de 0.9 e latência média observada de 9.66 ms em 5 consultas; CLI `--help` concluída. A geração foi a única etapa que falhou, com HTTP 404.
 
+## 2026-11-09 — Ajuste de chamadas GPT-OSS e limite de taxa
+
+- **Problema observado:** na geração real, o Groq respondeu com sucesso a várias chamadas, retornou HTTP 429 em outra chamada e o SDK repetiu a solicitação automaticamente após 31 segundos. A execução terminou sem conteúdo JSON válido e não salvou o plano.
+- **Alterado:** configurar GPT-OSS com `reasoning_effort="low"`, omitir o campo de raciocínio separado da resposta e definir `max_retries=0` para que erros de limite não iniciem chamadas repetidas ocultas.
+- **Teste criado:** verificar a configuração do modelo com um cliente simulado, sem acesso a rede ou chaves válidas.
+- **Limitação:** o log compartilhado não contém metadados de término/resposta suficientes para determinar por que o conteúdo final veio vazio. A nova configuração reduz esforço de raciocínio e chamadas repetidas automáticas, mas a próxima execução gratuita ainda precisa confirmar a resposta final do modelo.
+- **Segurança de saída:** a validação existente recusou corretamente o conteúdo inválido e nenhum plano incompleto foi salvo.
+
+## 2026-11-09 — Redução de uso do plano gratuito
+
+- **Evidência:** o painel da usuária mostrou 7 requisições e 23.9K tokens (19.2K de entrada, 4.7K de saída); o limite visível para `openai/gpt-oss-20b` era 8K tokens por minuto. O excesso de TPM, não o total de requisições diárias, é compatível com o `429` observado.
+- **Alterado:** calcular métricas do perfil localmente antes de chamar o agente; a ferramenta de cálculo deixa de consumir um ciclo do LLM.
+- **Alterado:** Tavily passa a ser opcional pela flag `--web-search`; sem ela, o runtime não exige a chave nem cria/chama a integração.
+- **Alterado:** reduzir o prompt removendo o exemplo JSON expandido para cada sessão; solicitar exatamente três exercícios por sessão e validar esse limite; reduzir o recursion limit padrão para quatro etapas.
+- **Testes adicionados/ajustados:** cobrem as métricas no perfil, prompt compacto, limite de exercícios, uso opcional do Tavily, configuração do runtime e mensagem específica para `429`.
+- **Validação executada:** imagem pytest recompilada — **61 testes aprovados**; imagem runtime recompilada; `--help` mostra a opção `--web-search`; construção local do cliente LangChain/Groq com as opções reduzidas passou sem fazer chamada externa.
+- **Limitação:** alterações de tokens precisam ser medidas no próximo uso real. Um plano de quatro dias por semana ainda pode exceder TPM/TPD dependendo dos limites atuais e do tamanho real do contexto/saída. Nenhuma geração externa foi feita durante esta mudança.
+
+## 2026-11-09 — Structured Outputs na etapa final do agente
+
+- **Problema observado:** duas execuções receberam HTTP 200 do Groq, mas a resposta terminou dentro de uma string JSON e foi recusada pelo validador; nenhum plano foi gravado por essas tentativas.
+- **Resultado da nova tentativa:** JSON Mode produziu JSON válido, mas faltaram `coach_analysis` e `safety`; novamente nenhum arquivo foi salvo.
+- **Diagnóstico:** o plano com 12 sessões ultrapassou a conclusão padrão documentada de 1024 tokens, e arrays sem tamanho fixo permitiam respostas com menos semanas/sessões. Um schema aninhado também foi recusado pelo endpoint.
+- **Alterado:** o modelo com ferramentas continua responsável por chamar o RAG; após o retorno, uma instância sem ferramentas usa Structured Outputs com JSON Schema estrito e `max_completion_tokens=4096`. Cada sessão é obrigatória em uma chave plana numerada, seus três exercícios também são campos obrigatórios e a resposta é normalizada para listas antes da validação existente.
+- **Testes adicionados:** cobrem os campos obrigatórios do schema estrito, sua configuração no cliente e a seleção do modelo final depois do RAG, sem chamadas externas.
+- **Validação:** container runtime reconstruído; configuração do cliente verificada localmente; **64 testes passaram**. Geração real concluída com duas chamadas Groq HTTP 200, 12 sessões, duração de 4.22 s, 5,785 tokens de entrada e 2,408 de saída. Plano salvo em `outputs/plano_de_treino_final.md`; nenhum Tavily foi chamado.
+
+## 2026-11-09 — Remoção de artefatos e código legado
+
+- **Removido:** o plano duplicado na raiz, o notebook de instalação, o notebook RAG antigo com integrações legadas, `ferramentas_ai.py`, a ferramenta de cálculo que não participa do runtime, e o banco Chroma binário versionado.
+- **Mantido:** `02_Agente_Treinador_Fitness.ipynb` para experimentação; `dados/conhecimento_fitness.txt` como fonte versionada que recria o índice; o plano atual em `outputs/`.
+- **Atualizado:** README e arquitetura para descrever a geração com schema estrito, ingestão reproduzível e apenas o notebook mantido. O teste isolado da ferramenta de cálculo obsoleta também foi removido.
+- **Validação:** `docker build --target test -t ai-fitness-coach:test .` — **63 testes passaram**; JSON e células Python do notebook mantido válidos; `git diff --check` sem problemas.
+
 ## Unreleased — Application modularization and container runtime
 
 - **Created:** `app/config/settings.py`, `app/tools/calculations.py`, `app/agent/`, `app/rag/`, `app/tools/`, `app/runtime.py`, and `app/main.py` to separate configuration, deterministic calculations, graph logic, RAG, integrations, and execution.

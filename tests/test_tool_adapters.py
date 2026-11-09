@@ -15,33 +15,6 @@ def install_fake_langchain_tool(monkeypatch):
     monkeypatch.setitem(sys.modules, "langchain_core.tools", tools)
 
 
-def test_calculation_tool_delegates_to_validated_shared_function(monkeypatch):
-    install_fake_langchain_tool(monkeypatch)
-    from app.tools.calculation_tool import create_calculation_tool
-
-    tool = create_calculation_tool()
-    result = tool(
-        age_years=30,
-        weight_kg=70,
-        height_cm=175,
-        sex="male",
-        training_days_per_week=3,
-        goal="maintenance",
-    )
-
-    assert "BMI" in result
-    assert "estimate" in result.lower()
-    with pytest.raises(ValueError):
-        tool(
-            age_years=0,
-            weight_kg=70,
-            height_cm=175,
-            sex="male",
-            training_days_per_week=3,
-            goal="maintenance",
-        )
-
-
 def test_rag_tool_returns_source_and_rejects_blank_queries(monkeypatch):
     install_fake_langchain_tool(monkeypatch)
     from app.tools import rag_tool

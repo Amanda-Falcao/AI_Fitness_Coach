@@ -6,14 +6,14 @@ from pathlib import Path
 import time
 
 from app.agent.graph import DEFAULT_RECURSION_LIMIT
-from app.agent.plan_output import parse_and_validate_plan, render_plan_markdown
+from app.agent.plan_output import normalize_groq_plan, parse_and_validate_plan, render_plan_markdown
 from app.agent.prompts import build_plan_prompt
 from app.config.settings import Settings
 from app.observability import aggregate_token_usage, configure_json_logging
 from app.rag.citations import citation_registry_from_messages
 from app.rag.ingestion import resolve_project_path
 from app.runtime import build_agent_application
-from app.tools.calculations import calculate_fitness_metrics
+from app.tools.calculations import calculate_fitness_metrics, format_fitness_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--frequency", type=int, required=True, help="Training days per week (1-7).")
     parser.add_argument("--goal", required=True, help="For example: hipertrofia, emagrecimento, or manutenção.")
     parser.add_argument("--output", default="outputs/plano_de_treino_final.md")
+    parser.add_argument(
+        "--web-search",
+        action="store_true",
+        help="Enable optional Tavily search; this may use your separate Tavily free quota.",
+    )
     return parser
 
 
@@ -35,7 +40,7 @@ def validate_profile(args: argparse.Namespace) -> dict[str, object]:
     """Validate the CLI profile through the same deterministic calculation contract."""
     if isinstance(args.frequency, bool) or not isinstance(args.frequency, int) or not 1 <= args.frequency <= 7:
         raise ValueError("frequency must be an integer between 1 and 7 for a training plan")
-    calculate_fitness_metrics(
+    metrics = calculate_fitness_metrics(
         age_years=args.age,
         weight_kg=args.weight_kg,
         height_cm=args.height_cm,
@@ -50,6 +55,7 @@ def validate_profile(args: argparse.Namespace) -> dict[str, object]:
         "gender": args.gender,
         "frequency": args.frequency,
         "goal": args.goal,
+        "reference_metrics": format_fitness_metrics(metrics, args.goal),
     }
 
 
@@ -58,11 +64,15 @@ def run_plan_generation(
 ) -> Path:
     """Invoke an injected graph and save its final response as Markdown."""
     started_at = time.perf_counter()
-    prompt = build_plan_prompt(profile)
+    prompt = build_plan_prompt(profile, web_search_enabled=bool(profile.get("web_search_enabled", False)))
+    recursion_limit = 6 if profile.get("web_search_enabled", False) else DEFAULT_RECURSION_LIMIT
     try:
         result = graph.invoke(
-            {"messages": [{"role": "user", "content": prompt}]},
-            config={"recursion_limit": DEFAULT_RECURSION_LIMIT},
+            {
+                "messages": [{"role": "user", "content": prompt}],
+                "sessions_per_week": int(profile["frequency"]),
+            },
+            config={"recursion_limit": recursion_limit},
         )
     except Exception as exc:
         logger.error(
@@ -73,6 +83,10 @@ def run_plan_generation(
                 "error_type": type(exc).__name__,
             },
         )
+        if type(exc).__name__ == "RateLimitError":
+            raise RuntimeError(
+                "Groq rate limit reached (HTTP 429); wait for the free-tier limit window to reset before retrying"
+            ) from None
         raise RuntimeError(
             f"Agent invocation failed ({type(exc).__name__}); check service availability and configuration"
         ) from None
@@ -82,8 +96,11 @@ def run_plan_generation(
     raw_content = getattr(messages[-1], "content", None)
     try:
         citation_registry = citation_registry_from_messages(messages)
+        normalized_content = normalize_groq_plan(
+            raw_content, sessions_per_week=int(profile["frequency"])
+        )
         plan = parse_and_validate_plan(
-            raw_content,
+            normalized_content,
             sessions_per_week=int(profile["frequency"]),
             citation_registry=citation_registry,
         )
@@ -120,8 +137,9 @@ def main() -> None:
     parser = create_argument_parser()
     args = parser.parse_args()
     profile = validate_profile(args)
-    settings = Settings.from_env(require_groq=True, require_tavily=True)
-    graph = build_agent_application(settings)
+    profile["web_search_enabled"] = args.web_search
+    settings = Settings.from_env(require_groq=True, require_tavily=args.web_search)
+    graph = build_agent_application(settings, enable_web_search=args.web_search)
     destination = run_plan_generation(
         profile, graph, args.output, model_name=settings.groq_model_name
     )

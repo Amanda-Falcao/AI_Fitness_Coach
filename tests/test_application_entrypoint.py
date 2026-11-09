@@ -32,13 +32,13 @@ def valid_plan_content(sessions_per_week=5):
                         "day": day,
                         "title": f"Treino {day}",
                         "exercises": [{
-                            "name": "Agachamento livre",
+                            "name": name,
                             "sets": 3,
                             "reps": "8-12",
                             "rest_seconds": 90,
                             "technique_cues": ["Mantenha a coluna neutra."],
                             "evidence_refs": [EVIDENCE_REF],
-                        }],
+                        } for name in ("Agachamento livre", "Leg press", "Cadeira extensora")],
                     }
                     for day in range(1, sessions_per_week + 1)
                 ],
@@ -54,11 +54,12 @@ def valid_plan_content(sessions_per_week=5):
     })
 
 
-def test_profile_validation_returns_only_expected_profile_fields():
+def test_profile_validation_returns_profile_with_local_reference_metrics():
     profile = validate_profile(VALID_ARGS)
 
     assert profile["frequency"] == 5
     assert profile["gender"] == "female"
+    assert "BMI:" in profile["reference_metrics"]
 
 
 def test_profile_validation_rejects_invalid_values():
@@ -81,18 +82,20 @@ def test_prompt_requests_three_weeks_and_expected_session_count():
         {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"}
     )
 
-    assert "exactly 15 distinct sessions" in prompt
-    assert "three weeks" in prompt
-    assert '"safety"' in prompt
+    assert "exactly 5 sessions per week (15 total)" in prompt
+    assert "3 weeks" in prompt
+    assert "Include coach_analysis and safety with all required fields" in prompt
     assert "valid JSON object" in prompt
-    assert prompt.count('"day":') == 15
+    assert "week_1_session_1 through week_3_session_5" in prompt
+    assert "exercise_1, exercise_2, exercise_3" in prompt
+    assert "exactly 3 exercises" in prompt
 
 
 def test_run_plan_generation_saves_injected_graph_result(tmp_path):
     class FakeGraph:
         def invoke(self, state, config):
             assert state["messages"][0]["role"] == "user"
-            assert config["recursion_limit"] == 12
+            assert config["recursion_limit"] == 4
             rag_result = json.dumps([{
                 "ref_id": EVIDENCE_REF,
                 "source": "dados/conhecimento_fitness.txt",
@@ -128,3 +131,19 @@ def test_run_plan_generation_does_not_write_invalid_output(tmp_path):
             destination,
         )
     assert not destination.exists()
+
+
+def test_rate_limit_failure_tells_user_to_wait_without_retrying(tmp_path):
+    class RateLimitError(Exception):
+        pass
+
+    class LimitedGraph:
+        def invoke(self, state, config):
+            raise RateLimitError("HTTP 429")
+
+    with pytest.raises(RuntimeError, match="free-tier limit window"):
+        run_plan_generation(
+            {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 5, "goal": "hipertrofia"},
+            LimitedGraph(),
+            tmp_path / "limited.md",
+        )

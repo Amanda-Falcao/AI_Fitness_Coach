@@ -8,3 +8,4 @@ class AgentState(TypedDict):
     """Conversation messages accumulated across the agent/tool loop."""
 
     messages: Annotated[list[Any], add]
+    sessions_per_week: int

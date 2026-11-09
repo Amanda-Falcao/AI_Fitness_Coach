@@ -5,20 +5,20 @@
 - `app/config/settings.py` reads model, Chroma, and API-key settings from the process environment without creating clients at import time.
 - `app/tools/calculations.py` contains deterministic profile validation and metric calculations. It does not depend on LangChain.
 - `app/agent/state.py` defines the message state and its append reducer.
-- `app/agent/nodes.py` defines model invocation and tool-call routing without importing LangGraph.
-- `app/agent/graph.py` binds the injected model/tools and compiles the LangGraph model/tool cycle.
+- `app/agent/nodes.py` defines tool selection, final schema-constrained model invocation after RAG, and tool-call routing without importing LangGraph.
+- `app/agent/graph.py` binds the tool-enabled model/tools and compiles the LangGraph flow with a separate no-tools final model.
 - `app/agent/prompts.py` builds the three-week plan request from a validated profile.
-- `app/agent/plan_output.py` validates the JSON response against the plan contract and renders Markdown only after validation.
+- `app/agent/plan_output.py` defines the Groq strict JSON Schema, validates the response against the plan contract, and renders Markdown only after validation.
 - `app/rag/embeddings.py` creates the Hugging Face embedding model on demand through the standalone `langchain-huggingface` integration.
 - `app/rag/ingestion.py` reads the fitness knowledge text, splits it, creates stable chunk IDs, and upserts it into Chroma through `langchain-chroma`. It is a separate offline operation.
 - `app/rag/retriever.py` checks that the persisted Chroma collection exists and contains records, then exposes a top-k retriever.
 - `app/rag/citations.py` accepts source/evidence records only from internal RAG tool messages and builds the citation registry used to validate model-selected IDs.
-- `app/tools/` contains lazy LangChain adapters for calculations, RAG, and Tavily.
+- `app/tools/` contains lazy LangChain adapters for calculations, RAG, and optional Tavily search. The CLI calculates profile metrics locally; calculation is not an LLM tool in the default flow.
 - `app/observability.py` emits JSON logs from an allowlist of fields and aggregates token metadata when returned by the provider; it does not estimate monetary cost.
-- `app/runtime.py` composes the Groq model, tools, and graph after configuration validation.
+- `app/runtime.py` composes the tool-enabled Groq model, a strict JSON Schema final Groq model, the required RAG tool, optional Tavily search, and graph after configuration validation.
 - `app/main.py` provides the command-line entry point and writes the generated plan.
-- `02_Agente_Treinador_Fitness.ipynb` remains an experimental entry point and delegates tool/runtime construction to the application modules.
-- `ferramentas_ai.py` remains as a legacy compatibility module; the application runtime uses the adapters under `app/tools/`.
+- `02_Agente_Treinador_Fitness.ipynb` is the only retained notebook; it delegates runtime construction and generation to the application modules.
+- The Chroma collection is generated from `dados/conhecimento_fitness.txt` and is not stored in the repository. Docker Compose persists it in a named volume; local execution creates it under the configured persistence path.
 
 ## Validation and evaluation
 
@@ -48,20 +48,21 @@ Run ingestion from the repository root with `python -m app.rag.ingestion`. Relat
 
 ```mermaid
 flowchart TD
-    A[Profile prompt] --> B[LangGraph agent node]
+    A[CLI profile] --> G[Local profile calculations]
+    G --> B[Compact prompt and LangGraph agent]
     B --> C{Tool calls?}
     C -- Yes --> D[LangGraph ToolNode]
-    D --> B
+    D --> J[Final Groq model: strict JSON Schema, no tools]
+    J --> E[JSON contract validation]
     C -- No --> E[JSON contract validation]
     E --> F[Markdown renderer and file]
-    B -. uses .-> G[Shared calculation tool]
-    B -. uses .-> H[Chroma retriever, top-k 3]
-    B -. uses .-> I[Tavily web search]
+    B -. calls once .-> H[Chroma retriever, top-k 3]
+    B -. optional CLI flag .-> I[Tavily web search]
 ```
 
-The graph is built by `app/agent/graph.py`; the notebook invokes the compiled app. The flow uses the append-only message reducer, routes tool requests through LangGraph's `ToolNode`, and returns to the model after tool execution. The notebook sets a recursion limit of 12 graph steps so a tool loop terminates with a LangGraph limit error instead of running indefinitely. When the RAG tool runs, the retriever embeds the query with the configured Hugging Face model, searches the existing Chroma collection, and returns up to three relevant chunks to the model. A missing or empty collection raises an explicit error instead of returning a tool result that resembles useful evidence.
+The graph is built by `app/agent/graph.py`; the notebook invokes the compiled app. The flow uses the append-only message reducer and routes tool requests through LangGraph's `ToolNode`. Once the RAG tool result appears in state, the agent node switches from the tool-bound model to a no-tools model configured with Groq strict JSON Schema Structured Outputs and a 4096-token completion ceiling. The schema uses flat required session slots and required exercise fields to guarantee three weeks, the requested number of sessions per week, and three exercises per session without relying on array length constraints. `normalize_groq_plan` converts those slots to the existing list-based contract. Application validation still enforces value ranges, unique training days, and citation membership. The default recursion limit is four graph steps, sufficient for one RAG call and a final response. An opt-in web search allows a larger bounded limit. When the RAG tool runs, the retriever embeds the query with the configured Hugging Face model, searches the existing Chroma collection, and returns up to three relevant chunks to the model. A missing or empty collection raises an explicit error instead of returning a tool result that resembles useful evidence.
 
-The RAG adapter creates each citation ID as a SHA-256 prefix over the source path and retrieved chunk content and fails if source metadata is missing. Retrieved passages and web results are marked as untrusted reference data in the prompt; this is a prompt-level mitigation, not a complete injection defense. The command-line entry point accepts profile arguments, validates them with the deterministic calculation contract, builds the runtime from environment settings, invokes the graph, collects citation records from RAG tool messages, validates the strict JSON response in `app/agent/plan_output.py`, renders Markdown deterministically with source IDs/excerpts, and saves only a valid plan. Each exercise must cite one to three IDs actually returned by RAG. The output contract checks three ordered weeks, the requested session count, unique training days per week, bounded exercise parameters, and required safety fields. It enforces structure and citation membership, not semantic entailment or medical suitability. API clients are created only when the runtime is built, not when modules are imported.
+The RAG adapter creates each citation ID as a SHA-256 prefix over the source path and retrieved chunk content and fails if source metadata is missing. Retrieved passages and optional web results are marked as untrusted reference data in the prompt; this is a prompt-level mitigation, not a complete injection defense. The command-line entry point accepts profile arguments, calculates reference metrics locally, builds the runtime from environment settings, invokes the graph, collects citation records from RAG tool messages, validates the strict JSON response in `app/agent/plan_output.py`, renders Markdown deterministically with source IDs/excerpts, and saves only a valid plan. Each exercise cites one ID actually returned by RAG. The output contract checks three ordered weeks, the requested session count, exactly three exercises per session, unique training days per week, bounded exercise parameters, and required safety fields. It enforces structure and citation membership, not semantic entailment or medical suitability. Tavily is instantiated only when `--web-search` is passed. API clients are created only when the runtime is built, not when modules are imported.
 
 ## Current boundaries and limitations
 

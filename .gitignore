@@ -16,4 +16,3 @@ data/*.sqlite
 
 # Logs e Checkpoints
 *.log
-outputs/

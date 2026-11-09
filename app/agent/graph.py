@@ -7,11 +7,17 @@ from app.agent.nodes import create_agent_node, route_after_agent
 from app.agent.state import AgentState
 
 
-DEFAULT_RECURSION_LIMIT = 12
+DEFAULT_RECURSION_LIMIT = 4
 
 
-def create_agent_graph(model: Any, tools: Sequence[Any], *, checkpointer: Any = None):
-    """Bind tools and compile the model/tool loop as a LangGraph application."""
+def create_agent_graph(
+    model: Any,
+    tools: Sequence[Any],
+    *,
+    final_model: Any = None,
+    checkpointer: Any = None,
+):
+    """Compile a tool-selection loop followed by an optional no-tools final model."""
     if not tools:
         raise ValueError("At least one tool is required to build the agent graph")
     try:
@@ -24,7 +30,7 @@ def create_agent_graph(model: Any, tools: Sequence[Any], *, checkpointer: Any = 
 
     model_with_tools = model.bind_tools(list(tools))
     workflow = StateGraph(AgentState)
-    workflow.add_node("agent", create_agent_node(model_with_tools))
+    workflow.add_node("agent", create_agent_node(model_with_tools, final_model=final_model))
     workflow.add_node("tools", ToolNode(list(tools)))
     workflow.set_entry_point("agent")
     workflow.add_conditional_edges(

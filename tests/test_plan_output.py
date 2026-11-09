@@ -4,9 +4,64 @@ import pytest
 
 from app.agent.plan_output import (
     PlanValidationError,
+    groq_plan_response_format,
+    normalize_groq_plan,
     parse_and_validate_plan,
     render_plan_markdown,
 )
+
+
+def test_groq_response_schema_requires_all_contract_fields_and_closes_objects():
+    response_format = groq_plan_response_format(4)
+    schema = response_format["json_schema"]["schema"]
+
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    assert schema["required"][0] == "title"
+    assert schema["required"][-2:] == ["coach_analysis", "safety"]
+    assert schema["additionalProperties"] is False
+    assert "week_1_session_1" in schema["required"]
+    assert "week_3_session_4" in schema["required"]
+    assert len([key for key in schema["required"] if key.startswith("week_")]) == 12
+    assert schema["properties"]["safety"]["required"] == [
+        "disclaimer", "stop_conditions", "seek_professional_if"
+    ]
+
+
+def test_normalize_groq_plan_converts_numbered_slots_to_application_lists():
+    plan = {
+        "title": "Plan",
+        "coach_analysis": "Progress gradually.",
+        "safety": {
+            "disclaimer": "General guidance.",
+            "stop_conditions": ["Stop if you feel pain."],
+            "seek_professional_if": ["Ask a professional if unsure."],
+        },
+    }
+    for week_number in range(1, 4):
+        plan[f"week_{week_number}_session_1"] = {
+            "day": 1,
+            "title": "Full body",
+            **{
+                f"exercise_{exercise_number}": {
+                    "name": f"Exercise {exercise_number}",
+                    "sets": 3,
+                    "reps": "8-12",
+                    "rest_seconds": 90,
+                    "technique_cue": "Use controlled movement",
+                    "evidence_ref": "KB-000000000000",
+                }
+                for exercise_number in range(1, 4)
+            },
+        }
+    normalized = json.loads(normalize_groq_plan(json.dumps(plan), 1))
+
+    assert len(normalized["weeks"]) == 3
+    assert len(normalized["weeks"][0]["sessions"]) == 1
+    assert len(normalized["weeks"][0]["sessions"][0]["exercises"]) == 3
+    assert normalized["weeks"][0]["sessions"][0]["exercises"][0]["technique_cues"] == [
+        "Use controlled movement"
+    ]
 
 
 def valid_plan(sessions_per_week=2):
@@ -21,13 +76,14 @@ def valid_plan(sessions_per_week=2):
                         "title": f"Treino {day}",
                         "exercises": [
                             {
-                                "name": "Agachamento livre",
+                                "name": exercise_name,
                                 "sets": 3,
                                 "reps": "8-12",
                                 "rest_seconds": 90,
                                 "technique_cues": ["Mantenha a coluna neutra."],
                                 "evidence_refs": ["KB-aaaaaaaaaaaa"],
                             }
+                            for exercise_name in ("Agachamento livre", "Leg press", "Cadeira extensora")
                         ],
                     }
                     for day in range(1, sessions_per_week + 1)
@@ -77,6 +133,14 @@ def test_rejects_incomplete_weeks_and_wrong_session_count():
     plan["weeks"][1]["sessions"].pop()
 
     with pytest.raises(PlanValidationError, match="exactly 2 sessions"):
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
+
+
+def test_rejects_session_with_wrong_number_of_exercises():
+    plan = valid_plan()
+    plan["weeks"][0]["sessions"][0]["exercises"].pop()
+
+    with pytest.raises(PlanValidationError, match="exactly 3 exercises"):
         parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
