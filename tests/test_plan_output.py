@@ -19,10 +19,11 @@ def test_groq_response_schema_requires_all_contract_fields_and_closes_objects():
     assert response_format["json_schema"]["strict"] is True
     assert schema["required"][0] == "title"
     assert schema["required"][-2:] == ["coach_analysis", "safety"]
+    assert all(f"week_{week}_progression" in schema["required"] for week in range(1, 4))
     assert schema["additionalProperties"] is False
     assert "week_1_session_1" in schema["required"]
     assert "week_3_session_4" in schema["required"]
-    assert len([key for key in schema["required"] if key.startswith("week_")]) == 12
+    assert len([key for key in schema["required"] if key.startswith("week_")]) == 15
     assert schema["properties"]["safety"]["required"] == [
         "disclaimer", "stop_conditions", "seek_professional_if"
     ]
@@ -32,6 +33,7 @@ def test_normalize_groq_plan_converts_numbered_slots_to_application_lists():
     plan = {
         "title": "Plan",
         "coach_analysis": "Progress gradually.",
+        **{f"week_{week}_progression": f"Week {week}: progress conditionally." for week in range(1, 4)},
         "safety": {
             "disclaimer": "General guidance.",
             "stop_conditions": ["Stop if you feel pain."],
@@ -70,6 +72,7 @@ def valid_plan(sessions_per_week=2):
         "weeks": [
             {
                 "week": week_number,
+                "progression": f"Semana {week_number}: progrida se mantiver a técnica.",
                 "sessions": [
                     {
                         "day": day,
@@ -117,6 +120,7 @@ def test_validates_exact_weekly_session_count_and_renders_markdown():
     assert markdown.startswith("# Plano de três semanas")
     assert markdown.count("### Sessão") == 6
     assert "## Segurança" in markdown
+    assert "**Progressão:** Semana 1" in markdown
     assert "Procure profissional" in markdown
     assert "guide.txt" in markdown
     assert "[KB-aaaaaaaaaaaa]" in markdown
@@ -168,6 +172,25 @@ def test_rejects_duplicate_days_in_a_week():
         parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
 
 
+def test_four_day_plan_requires_upper_lower_ab_order():
+    plan = valid_plan(sessions_per_week=4)
+    for week in plan["weeks"]:
+        for session, title in zip(week["sessions"], ("Upper A", "Lower A", "Upper B", "Lower B")):
+            session["title"] = title
+    parse_and_validate_plan(json.dumps(plan), sessions_per_week=4, citation_registry=VALID_CITATIONS)
+
+    plan["weeks"][0]["sessions"][1]["title"] = "Upper B"
+    with pytest.raises(PlanValidationError, match="Upper A, Lower A, Upper B, Lower B"):
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=4, citation_registry=VALID_CITATIONS)
+
+
+def test_rejects_missing_weekly_progression():
+    plan = valid_plan()
+    del plan["weeks"][1]["progression"]
+    with pytest.raises(PlanValidationError, match="invalid shape.*progression"):
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
+
+
 def test_rejects_unexpected_fields_and_boolean_week_numbers():
     plan = valid_plan()
     plan["weeks"][0]["week"] = True
@@ -187,3 +210,18 @@ def test_rejects_reference_not_returned_by_rag_tool():
 
     with pytest.raises(PlanValidationError, match="not returned by the RAG tool"):
         parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=VALID_CITATIONS)
+
+
+def test_prefers_returned_exercise_specific_reference_over_generic_reference():
+    plan = valid_plan()
+    plan["weeks"][0]["sessions"][0]["exercises"][0]["evidence_refs"] = ["KB-bbbbbbbbbbbb"]
+    citations = {
+        **VALID_CITATIONS,
+        "KB-bbbbbbbbbbbb": {
+            "source": "guide.txt",
+            "evidence": "Hipertrofia: use 3 a 4 séries de 8 a 12 repetições.",
+        },
+    }
+
+    with pytest.raises(PlanValidationError, match="exercise-specific evidence"):
+        parse_and_validate_plan(json.dumps(plan), sessions_per_week=2, citation_registry=citations)

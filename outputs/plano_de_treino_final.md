@@ -15,28 +15,28 @@
 
 - **Remada Curvada** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Manter o tronco fixo
-- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Puxar até o peito
-- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Braço alinhado
 
-### Sessão 3 — Pernas e Ombros (Dia 5)
+### Sessão 3 — Pernas (Dia 5)
 
 - **Agachamento Livre** — 4 séries × 8-10 (descanso: 120s) — Evidência: KB-6c14bff52e42
   - Técnica: Queda controlada
 - **Leg Press** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Extensão completa
-- **Desenvolvimento Militar** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Evitar hiperextensão
-
-### Sessão 4 — Full Body (Dia 7)
-
-- **Stiff** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Stiff Romeno** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Mantém a coluna neutra
-- **Supino Declinado** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-6c14bff52e42
-  - Técnica: Controle a descida
-- **Remada Unilateral** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Trapezio contraído
+
+### Sessão 4 — Ombros e Trapézio (Dia 7)
+
+- **Desenvolvimento Militar** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
+  - Técnica: Evitar hiperextensão lombar
+- **Elevação Lateral** — 3 séries × 10-12 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Braço ligeiramente flexionado
+- **Encolhimento de Ombros** — 3 séries × 12-15 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Contraia o trapézio
 
 ## Semana 2
 
@@ -53,28 +53,28 @@
 
 - **Remada Curvada** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Manter o tronco fixo
-- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Puxar até o peito
-- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Braço alinhado
 
-### Sessão 3 — Pernas e Ombros (Dia 6)
+### Sessão 3 — Pernas (Dia 6)
 
 - **Agachamento Livre** — 4 séries × 8-10 (descanso: 120s) — Evidência: KB-6c14bff52e42
   - Técnica: Queda controlada
 - **Leg Press** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Extensão completa
-- **Desenvolvimento Militar** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Evitar hiperextensão
-
-### Sessão 4 — Full Body (Dia 7)
-
-- **Stiff** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Stiff Romeno** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Mantém a coluna neutra
-- **Supino Declinado** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-6c14bff52e42
-  - Técnica: Controle a descida
-- **Remada Unilateral** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Trapezio contraído
+
+### Sessão 4 — Ombros e Trapézio (Dia 7)
+
+- **Desenvolvimento Militar** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
+  - Técnica: Evitar hiperextensão lombar
+- **Elevação Lateral** — 3 séries × 10-12 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Braço ligeiramente flexionado
+- **Encolhimento de Ombros** — 3 séries × 12-15 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Contraia o trapézio
 
 ## Semana 3
 
@@ -91,28 +91,28 @@
 
 - **Remada Curvada** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Manter o tronco fixo
-- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Puxada na Barra Fixa** — 3 séries × 8-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Puxar até o peito
-- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Rosca Direta** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
   - Técnica: Braço alinhado
 
-### Sessão 3 — Pernas e Ombros (Dia 5)
+### Sessão 3 — Pernas (Dia 5)
 
 - **Agachamento Livre** — 4 séries × 8-10 (descanso: 120s) — Evidência: KB-6c14bff52e42
   - Técnica: Queda controlada
 - **Leg Press** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Extensão completa
-- **Desenvolvimento Militar** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Evitar hiperextensão
-
-### Sessão 4 — Full Body (Dia 7)
-
-- **Stiff** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
+- **Stiff Romeno** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-6c14bff52e42
   - Técnica: Mantém a coluna neutra
-- **Supino Declinado** — 3 séries × 8-10 (descanso: 90s) — Evidência: KB-6c14bff52e42
-  - Técnica: Controle a descida
-- **Remada Unilateral** — 3 séries × 10-12 (descanso: 90s) — Evidência: KB-2135a161c56e
-  - Técnica: Trapezio contraído
+
+### Sessão 4 — Ombros e Trapézio (Dia 7)
+
+- **Desenvolvimento Militar** — 4 séries × 8-10 (descanso: 90s) — Evidência: KB-2135a161c56e
+  - Técnica: Evitar hiperextensão lombar
+- **Elevação Lateral** — 3 séries × 10-12 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Braço ligeiramente flexionado
+- **Encolhimento de Ombros** — 3 séries × 12-15 (descanso: 60s) — Evidência: KB-2135a161c56e
+  - Técnica: Contraia o trapézio
 
 ## Fontes da base de conhecimento
 
@@ -121,16 +121,16 @@
 
 ## Análise do Coach e Estratégia
 
-Plano baseado em volume 3-4 séries, 8-12 repetições, descanso 60-90s, conforme evidências. Repetição de sessões mantém frequência 4x/semana. Limitação: não há dados específicos de carga individual, portanto recomendações de carga são genéricas.
+Plano baseado em volume 3-4 séries, 8-12 repetições, descanso 60-90s, adequado para hipertrofia. Evidências limitadas para alguns exercícios; uso de variações padrão.
 
 ## Segurança
 
 - Este plano não substitui orientação profissional
 
 **Pare se:**
-- dor intensa
-- sentimento de tontura
+- Dor intensa
+- Desconforto extremo
 
 **Procure orientação profissional se:**
-- sintomas de dor persistente
-- lesões pré-existentes
+- Lesão pré-existente
+- Dor persistente

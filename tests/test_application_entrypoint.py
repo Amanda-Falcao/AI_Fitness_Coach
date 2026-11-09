@@ -27,6 +27,7 @@ def valid_plan_content(sessions_per_week=5):
         "weeks": [
             {
                 "week": week,
+                "progression": f"Semana {week}: progrida apenas com execução correta.",
                 "sessions": [
                     {
                         "day": day,
@@ -89,6 +90,17 @@ def test_prompt_requests_three_weeks_and_expected_session_count():
     assert "week_1_session_1 through week_3_session_5" in prompt
     assert "exercise_1, exercise_2, exercise_3" in prompt
     assert "exactly 3 exercises" in prompt
+
+
+def test_four_day_prompt_requires_upper_lower_ab_and_conditional_progression():
+    prompt = build_plan_prompt(
+        {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 4, "goal": "hipertrofia"}
+    )
+
+    assert "Upper A, Lower A, Upper B, Lower B" in prompt
+    assert "week_1_progression" in prompt
+    assert "only when every set was completed with sound technique" in prompt
+    assert "Do not attach generic evidence to a specific exercise claim" in prompt
 
 
 def test_run_plan_generation_saves_injected_graph_result(tmp_path):

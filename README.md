@@ -11,7 +11,8 @@ Este projeto é um protótipo para portfólio de engenharia. Os planos gerados n
 - Geração aumentada por recuperação (RAG) sobre uma base local de textos de treinamento, com embeddings do Hugging Face e Chroma.
 - Citações por exercício vinculadas a trechos realmente retornados pela ferramenta RAG interna.
 - Pesquisa opcional com Tavily para informações gerais atualizadas sobre treinamento; desativada no fluxo padrão para preservar sua cota gratuita.
-- Schema de saída que exige três semanas, o número solicitado de sessões e três exercícios por sessão; a aplicação valida valores e referências antes da renderização determinística em Markdown.
+- Schema de saída que exige três semanas, progressão descrita em cada semana, o número solicitado de sessões e três exercícios por sessão. Para frequência de quatro dias, aplica a ordem Upper A, Lower A, Upper B e Lower B.
+- Referências de exercícios priorizam trechos específicos retornados pelo RAG quando disponíveis; dicas de execução são curtas e a progressão usa repetições/carga condicionadas à técnica, sem inventar pesos.
 - Campos obrigatórios de aviso de segurança, condições para interromper o treino e orientação para buscar ajuda profissional.
 - Interface de linha de comando e notebook mantido para experimentação.
 - Imagem Docker de execução e imagem isolada para testes com pytest.
@@ -95,7 +96,7 @@ O plano será salvo no host em `outputs/plano_de_treino_final.md`. O Compose man
 O caminho padrão calcula métricas localmente e não chama Tavily. O agente consulta a base RAG e pede ao LLM um plano conciso com três exercícios por sessão. Uma geração usa no máximo um ciclo RAG por padrão; o limite de recursão protege contra loops que consumiriam chamadas adicionais. Para permitir pesquisa externa, use a flag `--web-search`; ela adiciona o Tavily e pode consumir a cota gratuita separada desse serviço.
 
 Após a consulta RAG, o GPT-OSS gera a resposta final com Structured Outputs e um schema estrito, com orçamento de até 4096 tokens de conclusão. A aplicação converte os campos numerados para sua estrutura interna, valida contagens, limites e citações e só então renderiza o Markdown. Essa validação estrutural não comprova segurança médica nem correção factual; revise os planos antes de utilizá-los.
-Cada citação de exercício precisa apontar para um ID estável `KB-...` presente nas mensagens reais da ferramenta RAG. As fontes e os trechos exibidos são obtidos desses registros. Isso verifica a presença e a proveniência da citação, mas não se o texto citado sustenta logicamente a afirmação.
+Cada citação de exercício precisa apontar para um ID estável `KB-...` presente nas mensagens reais da ferramenta RAG. Se os resultados incluírem um trecho que nomeia o exercício, a validação exige esse trecho. Essa checagem é lexical e limitada: não prova que toda afirmação seja sustentada semanticamente nem que o plano seja adequado para uma pessoa específica.
 
 Os logs da geração são emitidos como linhas JSON. Incluem duração e número de sessões e, quando os metadados da resposta do provedor fornecem essa informação, o uso de tokens. Prompts, valores do perfil do usuário, trechos recuperados e credenciais não são registrados. A aplicação não estima o custo monetário.
 Para o GPT-OSS, o cliente usa esforço de raciocínio baixo e não inclui o campo separado de raciocínio na resposta. Repetições automáticas do SDK estão desativadas; se o Groq retornar limite de taxa (`429`), aguarde o período indicado antes de iniciar outra geração.

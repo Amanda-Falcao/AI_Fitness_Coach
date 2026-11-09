@@ -2,10 +2,31 @@
 
 import json
 import re
+import unicodedata
 from typing import Any
 
 
 _REFERENCE_PATTERN = re.compile(r"^KB-[0-9a-f]{12}$")
+_EXERCISE_ALIASES = {
+    "agachamento": ("agachamento", "squat"),
+    "supino": ("supino", "bench press"),
+    "levantamento terra": ("levantamento terra", "deadlift"),
+    "remada curvada": ("remada curvada", "bent row"),
+    "desenvolvimento militar": ("desenvolvimento militar", "overhead press"),
+}
+
+
+def _normalized_text(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value.casefold())
+    return " ".join("".join(char for char in decomposed if not unicodedata.combining(char)).split())
+
+
+def _specific_evidence_terms(exercise_name: str) -> tuple[str, ...]:
+    normalized_name = _normalized_text(exercise_name)
+    for canonical, aliases in _EXERCISE_ALIASES.items():
+        if canonical in normalized_name or any(alias in normalized_name for alias in aliases):
+            return aliases
+    return (normalized_name,)
 
 
 class PlanValidationError(ValueError):
@@ -45,6 +66,7 @@ def groq_plan_response_format(sessions_per_week: int) -> dict[str, Any]:
     })
     schema = closed_object({
         "title": text,
+        **{f"week_{week}_progression": text for week in range(1, 4)},
         **{
             f"week_{week}_session_{session_number}": session
             for week in range(1, 4)
@@ -92,7 +114,11 @@ def normalize_groq_plan(raw_content: str, sessions_per_week: int) -> str:
                     "title": session["title"],
                     "exercises": exercises,
                 })
-            weeks.append({"week": week_number, "sessions": sessions})
+            weeks.append({
+                "week": week_number,
+                "progression": plan.pop(f"week_{week_number}_progression"),
+                "sessions": sessions,
+            })
         plan["weeks"] = weeks
         return json.dumps(plan, ensure_ascii=False)
     except (AttributeError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -149,10 +175,11 @@ def parse_and_validate_plan(
         raise PlanValidationError("Plan must contain exactly three weeks")
 
     for week_index, week in enumerate(weeks, start=1):
-        _require_keys(week, {"week", "sessions"}, f"week {week_index}")
+        _require_keys(week, {"week", "progression", "sessions"}, f"week {week_index}")
         week_number = _require_integer(week.get("week"), f"week {week_index}.week", 1, 3)
         if week_number != week_index:
             raise PlanValidationError(f"Week entries must be numbered sequentially from 1 to 3 (expected {week_index})")
+        _require_text(week.get("progression"), f"week {week_index}.progression", max_length=500)
         sessions = week.get("sessions")
         if not isinstance(sessions, list) or len(sessions) != sessions_per_week:
             raise PlanValidationError(
@@ -196,6 +223,25 @@ def parse_and_validate_plan(
                         raise PlanValidationError(
                             f"{exercise_label} cites evidence that was not returned by the RAG tool: {reference}"
                         )
+                specific_terms = _specific_evidence_terms(exercise["name"])
+                available_specific_refs = {
+                    ref_id
+                    for ref_id, citation in citation_registry.items()
+                    if any(term in _normalized_text(citation["evidence"]) for term in specific_terms)
+                }
+                if available_specific_refs and not available_specific_refs.intersection(references):
+                    raise PlanValidationError(
+                        f"{exercise_label} must cite the retrieved exercise-specific evidence"
+                    )
+
+    if sessions_per_week == 4:
+        expected_titles = ["upper a", "lower a", "upper b", "lower b"]
+        for week_index, week in enumerate(weeks, start=1):
+            titles = [session["title"].strip().casefold() for session in week["sessions"]]
+            if titles != expected_titles:
+                raise PlanValidationError(
+                    f"Week {week_index} must use the Upper A, Lower A, Upper B, Lower B split"
+                )
 
     _require_text(plan.get("coach_analysis"), "coach_analysis", max_length=4000)
     safety = plan.get("safety")
@@ -216,7 +262,12 @@ def render_plan_markdown(
     """Render a validated plan deterministically for the CLI and notebook."""
     lines = [f"# {plan['title']}", ""]
     for week in plan["weeks"]:
-        lines.extend([f"## Semana {week['week']}", ""])
+        lines.extend([
+            f"## Semana {week['week']}",
+            "",
+            f"**Progressão:** {week['progression']}",
+            "",
+        ])
         for index, session in enumerate(week["sessions"], start=1):
             lines.extend([f"### Sessão {index} — {session['title']} (Dia {session['day']})", ""])
             for exercise in session["exercises"]:

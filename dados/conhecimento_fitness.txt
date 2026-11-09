@@ -1,9 +1,9 @@
 # TEORIA FUNDAMENTAL DO TREINAMENTO
 
 Princípio da Sobrecarga Progressiva:
-Definição: Para que um músculo continue crescendo ou ficando mais forte, ele deve ser constantemente desafiado a fazer mais do que fez anteriormente.
-Métodos de Progressão: Aumentar a carga (peso), aumentar o número de repetições na mesma série, aumentar o número total de séries (volume), ou diminuir o tempo de descanso entre as séries.
-Importância: É o fator mais crucial para a hipertrofia e a força. O agente deve planejar aumentos graduais ao longo das 3 semanas.
+Definição: Ao longo do tempo, o treino pode progredir quando a pessoa realiza mais trabalho mantendo boa técnica e recuperação adequada.
+Aplicação neste plano de 3 semanas: Semana 1 estabelece uma referência de execução e esforço. Na semana 2, tente acrescentar repetições dentro da faixa prescrita somente se todas as séries anteriores foram concluídas com boa técnica; caso contrário, mantenha a meta. Na semana 3, considere aumentar a carga apenas quando todas as séries alcançarem o limite superior da faixa com boa técnica; caso contrário, mantenha a carga e continue progredindo repetições. Não prescreva quilos ou percentuais sem conhecer as cargas atuais.
+Não é necessário aumentar séries ou encurtar descansos para progredir neste plano. Preserve recuperação e ajuste o treino se a execução ou o desempenho piorar.
 
 Falha Muscular:
 O que é: O ponto em que o músculo não consegue completar mais nenhuma repetição com boa forma.
@@ -11,7 +11,7 @@ Recomendação (Hipertrofia): Treinar até 1 ou 2 repetições da falha (RIR 1-2
 Recomendação (Força): Treinar próximo à falha (RIR 0-1) nas séries principais, pois o objetivo é o máximo recrutamento neural.
 
 Hipertrofia:
-Séries/Repetições: 3 a 4 séries, 8 a 12 repetições. Carga moderada a alta.
+Séries/Repetições: 3 a 4 séries, 8 a 12 repetições. Escolha uma carga que permita completar a faixa com técnica adequada.
 Descanso: 60 a 90 segundos. O tempo é suficiente para recuperação parcial, maximizando o estresse metabólico.
 Foco: Tempo sob tensão, volume e estresse metabólico.
 
@@ -36,20 +36,24 @@ Foco: Alto gasto calórico e densidade do treino. Circuitos e supersets são mé
 
 Agachamento Livre (Barra):
 Músculos: Primário: Quadríceps e Glúteos. Secundário: Lombar e Core.
-Dicas: **Caminho da Barra Vertical.** Manter a coluna neutra e o peito alto. O peso distribuído no meio/calcanhares. A amplitude ideal é abaixo da paralela, maximizando o recrutamento do glúteo.
+Dicas: Mantenha a barra sobre a região média dos pés e a coluna neutra. Use uma amplitude controlada que consiga manter sem dor ou perda de posição; não imponha uma profundidade única para todas as pessoas.
 
 Supino Reto (Barra):
 Músculos: Primário: Peitoral Maior. Secundário: Tríceps e Deltóide Anterior.
-Dicas: **Retrair as escápulas** (travar os ombros) para estabilidade e proteger o manguito rotador. Descer a barra controladamente na linha dos mamilos. A pegada deve ser ligeiramente maior que a largura dos ombros.
+Dicas: Mantenha as escápulas estáveis no banco e desça a barra com controle em direção à região média do peito. Use uma pegada confortável e estável.
 
 Levantamento Terra (Deadlift):
 Músculos: Cadeia Posterior (Glúteos, Isquiotibiais e Lombar).
-Dicas: **Manter a barra próxima ao corpo** (idealmente deslizando na perna). Manter a coluna reta (neutra) e o Core ativo. O movimento é uma extensão do quadril.
+Dicas: Mantenha a barra próxima ao corpo, a coluna neutra e o tronco firme. Inicie o movimento empurrando o chão e estenda o quadril para ficar em pé.
 
 Remada Curvada (Barra):
 Músculos: Primário: Dorsais (Latíssimo). Secundário: Bíceps e Trapézio.
-Dicas: **Manter o tronco fixo e inclinado.** Puxar em direção ao umbigo. Concentrar-se em levar os cotovelos para trás e espremer as omoplatas para trás no final da concêntrica (puxada).
+Dicas: Mantenha o tronco firme e inclinado. Puxe a barra em direção ao abdômen, conduzindo o movimento com os cotovelos.
 
 Desenvolvimento Militar (Overhead Press):
-Músculos: Deltóide (Ombros, todas as cabeças) e Tríceps.
-Dicas: **Evitar a Hiperextensão da Lombar.** Core e glúteos contraídos para manter o corpo reto. A barra deve se mover em um arco limpo, subindo e levemente para trás da cabeça.
+Músculos: Deltoides e tríceps.
+Dicas: Contraia o abdômen e os glúteos para evitar compensar o movimento com a lombar. Mantenha a barra próxima ao rosto durante a subida.
+
+# ESCOPO DAS REFERÊNCIAS
+
+Use trechos gerais de hipertrofia para justificar somente variáveis de programação, como séries, repetições e descanso. Eles não comprovam a escolha, os músculos-alvo ou a técnica de um exercício específico. Para citar uma dica de execução ou uma afirmação sobre um exercício, use o trecho que nomeia esse exercício. Se a busca não retornar um trecho específico, prefira exercícios nomeados nos resultados e não atribua uma dica genérica a outro exercício.

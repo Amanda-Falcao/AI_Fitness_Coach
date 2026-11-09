@@ -87,3 +87,13 @@
 - CI commands (pytest and notebook JSON/code syntax) were exercised locally in the container-equivalent environment; the hosted GitHub Actions run has not occurred from this workspace.
 - Real LangChain `@tool` + LangGraph tool-cycle smoke with a fake retriever/model — passed; citation IDs resolved to the returned source/evidence and rendered into Markdown.
 - No live Groq or Tavily call and no full plan generation was performed; these require valid user credentials and incur external service usage. Embedding model download, ingestion, and retrieval evaluation were run in the Compose container.
+
+## 2026-11-09 — Improve generated-plan progression, split, and evidence use
+
+- **Modified:** `app/agent/prompts.py` to require a conditional three-week progression, the Upper A/Lower A/Upper B/Lower B order for four-day plans, and exercise-specific evidence/cues where retrieved.
+- **Modified:** `app/agent/plan_output.py` to add required per-week progression fields, render them in Markdown, validate the four-day split, and prefer a returned reference that names a planned exercise.
+- **Modified:** `dados/conhecimento_fitness.txt` to clarify the progression rule, scope citations, and replace rigid or vague execution claims with concise cues; no new external evidence claims were added.
+- **Modified:** tests for progression fields, the four-day split, and preference for a returned exercise-specific citation.
+- **Modified:** README, architecture documentation, and ADR-016 to describe the updated contract and its lexical validation limits.
+- **API behavior:** No extra model call or new runtime dependency was added.
+- **Re-ingestion:** The source text changed, so run the existing RAG ingestion command before the next plan generation to refresh the Chroma chunks.
