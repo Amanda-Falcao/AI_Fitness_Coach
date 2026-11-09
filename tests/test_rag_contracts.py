@@ -41,17 +41,20 @@ def test_ingestion_upserts_deterministic_ids_and_deletes_stale_source_chunks(mon
         def __init__(self, **kwargs):
             self.added = None
             self.deleted = None
+            self.ids = None
             type(self).instance = self
 
         def get(self, where):
             assert where == {"source": "knowledge.txt"}
-            return {"ids": ["stale-id", stable_id]}
+            return {"ids": self.ids if self.ids is not None else ["stale-id", stable_id]}
 
         def add_documents(self, documents, ids):
             self.added = (documents, ids)
+            self.ids = list(set(self.ids or ["stale-id", stable_id]) | set(ids))
 
         def delete(self, ids):
             self.deleted = ids
+            self.ids = [item for item in self.ids if item not in ids]
 
     store = FakeVectorStore
     result = ingest_knowledge_base(

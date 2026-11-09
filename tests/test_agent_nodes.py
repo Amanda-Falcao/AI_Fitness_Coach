@@ -55,6 +55,7 @@ def test_model_node_uses_final_model_after_internal_rag_result():
     schema = bind_options["response_format"]["json_schema"]["schema"]
     assert "week_1_session_1" in schema["required"]
     assert "week_3_session_4" in schema["required"]
+    assert "week_1_progression" not in schema["required"]
 
 
 def test_model_node_rejects_empty_state():

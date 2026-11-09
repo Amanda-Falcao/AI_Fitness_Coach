@@ -11,8 +11,8 @@ Este projeto é um protótipo para portfólio de engenharia. Os planos gerados n
 - Geração aumentada por recuperação (RAG) sobre uma base local de textos de treinamento, com embeddings do Hugging Face e Chroma.
 - Citações por exercício vinculadas a trechos realmente retornados pela ferramenta RAG interna.
 - Pesquisa opcional com Tavily para informações gerais atualizadas sobre treinamento; desativada no fluxo padrão para preservar sua cota gratuita.
-- Schema de saída que exige três semanas, progressão descrita em cada semana, o número solicitado de sessões e três exercícios por sessão. Para frequência de quatro dias, aplica a ordem Upper A, Lower A, Upper B e Lower B.
-- Referências de exercícios priorizam trechos específicos retornados pelo RAG quando disponíveis; dicas de execução são curtas e a progressão usa repetições/carga condicionadas à técnica, sem inventar pesos.
+- Schema de saída que exige três semanas, o número solicitado de sessões e três exercícios por sessão. A aplicação define progressão determinística; para quatro dias, valida a ordem Upper A, Lower A, Upper B e Lower B e a região muscular documentada de cada exercício.
+- Exercícios só são aceitos quando aparecem em uma seção própria da base recuperada. Dicas vêm diretamente de `Dicas:`, referências exibem a seção correspondente sem truncamento, e séries/repetições/descanso ficam estáveis dentro das faixas documentadas.
 - Campos obrigatórios de aviso de segurança, condições para interromper o treino e orientação para buscar ajuda profissional.
 - Interface de linha de comando e notebook mantido para experimentação.
 - Imagem Docker de execução e imagem isolada para testes com pytest.
@@ -91,7 +91,7 @@ docker compose run --rm --entrypoint python fitness-coach \
   --goal hipertrofia
 ```
 
-O plano será salvo no host em `outputs/plano_de_treino_final.md`. O Compose mantém os dados do Chroma e os arquivos do modelo Hugging Face em volumes nomeados.
+O plano será salvo no host em `outputs/plano_teste_atualizado.md`. O Compose mantém os dados do Chroma e os arquivos do modelo Hugging Face em volumes nomeados.
 
 O caminho padrão calcula métricas localmente e não chama Tavily. O agente consulta a base RAG e pede ao LLM um plano conciso com três exercícios por sessão. Uma geração usa no máximo um ciclo RAG por padrão; o limite de recursão protege contra loops que consumiriam chamadas adicionais. Para permitir pesquisa externa, use a flag `--web-search`; ela adiciona o Tavily e pode consumir a cota gratuita separada desse serviço.
 

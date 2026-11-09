@@ -36,7 +36,9 @@ def build_agent_application(settings: Settings | None = None, *, enable_web_sear
         "max_completion_tokens": 4096,
     }
     final_model = ChatGroq(**final_model_options)
-    tools = [create_rag_tool(persist_directory=settings.chroma_persist_directory, k=3)]
+    # The single local retrieval must expose every exercise section so the
+    # final plan can be validated without another model or search call.
+    tools = [create_rag_tool(persist_directory=settings.chroma_persist_directory, k=32)]
     if enable_web_search:
         tools.append(create_web_search_tool(settings.tavily_api_key or ""))
     return create_agent_graph(model, tools, final_model=final_model)

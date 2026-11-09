@@ -17,8 +17,22 @@ VALID_ARGS = Namespace(
     frequency=5,
     goal="hipertrofia",
 )
-EVIDENCE_TEXT = "Agachamento livre melhora força em quadríceps e glúteos."
-EVIDENCE_REF = "KB-" + sha256(f"dados/conhecimento_fitness.txt\0{EVIDENCE_TEXT}".encode("utf-8")).hexdigest()[:12]
+EXERCISE_EVIDENCE = {
+    "Supino Reto (Barra)": "### Supino Reto (Barra)\nRegião: Superior.\nMúsculos: Peitoral maior, tríceps e deltoide anterior.\nDicas: Mantenha as escápulas estáveis no banco.",
+    "Remada Curvada (Barra)": "### Remada Curvada (Barra)\nRegião: Superior.\nMúsculos: Dorsais, bíceps e trapézio.\nDicas: Puxe a barra em direção ao abdômen.",
+    "Desenvolvimento Militar (Overhead Press)": "### Desenvolvimento Militar (Overhead Press)\nRegião: Superior.\nMúsculos: Deltoides e tríceps.\nDicas: Contraia o abdômen e os glúteos.",
+    "Flexão de Braços (Push-up)": "### Flexão de Braços (Push-up)\nRegião: Superior.\nMúsculos: Peitoral, tríceps e ombros.\nDicas: Mantenha o tronco alinhado.",
+    "Agachamento Livre (Barra)": "### Agachamento Livre (Barra)\nRegião: Inferior.\nMúsculos: Quadríceps e glúteos.\nDicas: Mantenha a coluna neutra.",
+    "Levantamento Terra (Deadlift)": "### Levantamento Terra (Deadlift)\nRegião: Inferior.\nMúsculos: Glúteos e posteriores.\nDicas: Mantenha a barra próxima ao corpo.",
+    "Levantamento Terra Romeno": "### Levantamento Terra Romeno\nRegião: Inferior.\nMúsculos: Posteriores e glúteos.\nDicas: Leve o quadril para trás.",
+    "Avanço Reverso (Reverse Lunge)": "### Avanço Reverso (Reverse Lunge)\nRegião: Inferior.\nMúsculos: Glúteos e coxas.\nDicas: Dê um passo para trás com controle.",
+}
+EVIDENCE_REFS = {
+    name: "KB-" + sha256(f"dados/conhecimento_fitness.txt\0{text}".encode("utf-8")).hexdigest()[:12]
+    for name, text in EXERCISE_EVIDENCE.items()
+}
+RULE_EVIDENCE = "Hipertrofia\nSéries/Repetições: 3 a 4 séries, 8 a 12 repetições.\nDescanso: 60 a 90 segundos."
+RULE_REF = "KB-" + sha256(f"dados/conhecimento_fitness.txt\0{RULE_EVIDENCE}".encode("utf-8")).hexdigest()[:12]
 
 
 def valid_plan_content(sessions_per_week=5):
@@ -38,8 +52,8 @@ def valid_plan_content(sessions_per_week=5):
                             "reps": "8-12",
                             "rest_seconds": 90,
                             "technique_cues": ["Mantenha a coluna neutra."],
-                            "evidence_refs": [EVIDENCE_REF],
-                        } for name in ("Agachamento livre", "Leg press", "Cadeira extensora")],
+                            "evidence_refs": [EVIDENCE_REFS[name]],
+                        } for name in list(EXERCISE_EVIDENCE)[4:7]],
                     }
                     for day in range(1, sessions_per_week + 1)
                 ],
@@ -98,9 +112,9 @@ def test_four_day_prompt_requires_upper_lower_ab_and_conditional_progression():
     )
 
     assert "Upper A, Lower A, Upper B, Lower B" in prompt
-    assert "week_1_progression" in prompt
-    assert "only when every set was completed with sound technique" in prompt
-    assert "Do not attach generic evidence to a specific exercise claim" in prompt
+    assert "progression rules deterministically" in prompt
+    assert "Keep session days, titles, exercise names, sets, reps, and rest identical across all weeks" in prompt
+    assert "Do not attach generic evidence to a specific exercise" in prompt
 
 
 def test_run_plan_generation_saves_injected_graph_result(tmp_path):
@@ -109,9 +123,13 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
             assert state["messages"][0]["role"] == "user"
             assert config["recursion_limit"] == 4
             rag_result = json.dumps([{
-                "ref_id": EVIDENCE_REF,
+                "ref_id": EVIDENCE_REFS[name],
                 "source": "dados/conhecimento_fitness.txt",
-                "evidence": EVIDENCE_TEXT,
+                "evidence": text,
+            } for name, text in EXERCISE_EVIDENCE.items()] + [{
+                "ref_id": RULE_REF,
+                "source": "dados/conhecimento_fitness.txt",
+                "evidence": RULE_EVIDENCE,
             }], ensure_ascii=False)
             return {"messages": [
                 SimpleNamespace(name="fitness_knowledge_base_search", content=rag_result),
@@ -126,8 +144,53 @@ def test_run_plan_generation_saves_injected_graph_result(tmp_path):
 
     assert output.read_text(encoding="utf-8").startswith("# Plano de três semanas\n")
     assert output.read_text(encoding="utf-8").count("### Sessão") == 15
-    assert EVIDENCE_REF in output.read_text(encoding="utf-8")
+    assert EVIDENCE_REFS["Agachamento Livre (Barra)"] in output.read_text(encoding="utf-8")
     assert "dados/conhecimento_fitness.txt" in output.read_text(encoding="utf-8")
+
+
+def test_four_day_generation_renders_complete_document_from_retrieved_sections(tmp_path):
+    class FakeGraph:
+        def invoke(self, state, config):
+            records = [{
+                "ref_id": EVIDENCE_REFS[name], "source": "dados/conhecimento_fitness.txt", "evidence": text,
+            } for name, text in EXERCISE_EVIDENCE.items()]
+            records.append({"ref_id": RULE_REF, "source": "dados/conhecimento_fitness.txt", "evidence": RULE_EVIDENCE})
+            weeks = []
+            layouts = (
+                ("Upper A", ("Supino Reto (Barra)", "Remada Curvada (Barra)", "Desenvolvimento Militar (Overhead Press)")),
+                ("Lower A", ("Agachamento Livre (Barra)", "Levantamento Terra (Deadlift)", "Avanço Reverso (Reverse Lunge)")),
+                ("Upper B", ("Flexão de Braços (Push-up)", "Remada Curvada (Barra)", "Desenvolvimento Militar (Overhead Press)")),
+                ("Lower B", ("Agachamento Livre (Barra)", "Levantamento Terra Romeno", "Avanço Reverso (Reverse Lunge)")),
+            )
+            for week in range(1, 4):
+                weeks.append({"week": week, "progression": "model progression", "sessions": [
+                    {"day": index, "title": title, "exercises": [{
+                        "name": name, "sets": 3, "reps": "8-12", "rest_seconds": 90,
+                        "technique_cues": ["untrusted model cue"], "evidence_refs": [EVIDENCE_REFS[name]],
+                    } for name in names]} for index, (title, names) in enumerate(layouts, 1)
+                ]})
+            response = json.dumps({
+                "title": "Plano Upper/Lower de quatro dias", "weeks": weeks,
+                "coach_analysis": "Progrida de forma condicionada à execução.",
+                "safety": {"disclaimer": "Plano informativo.", "stop_conditions": ["Pare em caso de dor."],
+                           "seek_professional_if": ["Procure orientação em caso de lesão."]},
+            }, ensure_ascii=False)
+            return {"messages": [
+                SimpleNamespace(name="fitness_knowledge_base_search", content=json.dumps(records, ensure_ascii=False)),
+                SimpleNamespace(content=response),
+            ]}
+
+    output = run_plan_generation(
+        {"age": 28, "weight_kg": 60, "height_cm": 164, "gender": "female", "frequency": 4, "goal": "hipertrofia"},
+        FakeGraph(), tmp_path / "four_day_plan.md",
+    )
+    markdown = output.read_text(encoding="utf-8")
+    assert markdown.count("### Sessão") == 12
+    assert markdown.count("| Exercício | Séries | Repetições | Descanso | Referência |") == 12
+    assert "## Guia de execução" in markdown
+    assert markdown.count("Mantenha a coluna neutra.") == 1
+    assert "untrusted model cue" not in markdown
+    assert "Hipertrofia\nSéries/Repetições" not in markdown
 
 
 def test_run_plan_generation_does_not_write_invalid_output(tmp_path):

@@ -4,6 +4,7 @@ import argparse
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
+import re
 
 from app.config.settings import Settings
 from app.rag.embeddings import create_embedding_model
@@ -73,15 +74,39 @@ def load_and_split_documents(
         source = source_path.relative_to(PROJECT_ROOT).as_posix()
     except ValueError:
         source = source_path.as_posix()
-    documents = [Document(page_content=content, metadata={"source": source})]
-
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=len,
-        is_separator_regex=False,
-    )
-    chunks = splitter.split_documents(documents)
+    # Exercise sections are kept intact so retrieval and citations cannot mix
+    # the technique cue for one movement with another movement's description.
+    section_pattern = re.compile(r"(?m)^### (.+?)\s*$")
+    matches = list(section_pattern.finditer(content))
+    chunks = []
+    if matches:
+        general_content = content[:matches[0].start()].strip()
+        if general_content:
+            general_document = Document(page_content=general_content, metadata={"source": source})
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                length_function=len,
+                is_separator_regex=False,
+            )
+            chunks.extend(splitter.split_documents([general_document]))
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+            section = content[match.start():end].strip()
+            title = match.group(1).strip()
+            chunks.append(Document(
+                page_content=section,
+                metadata={"source": source, "section": title},
+            ))
+    else:
+        document = Document(page_content=content, metadata={"source": source})
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            is_separator_regex=False,
+        )
+        chunks = splitter.split_documents([document])
     if not chunks:
         raise IngestionError(f"No chunks were produced from knowledge source: {source}")
     return source, chunks
@@ -125,6 +150,13 @@ def ingest_knowledge_base(
         stale_ids = old_ids.difference(chunk_ids)
         if stale_ids:
             vector_store.delete(ids=sorted(stale_ids))
+        stored_ids = set(vector_store.get(where={"source": source}).get("ids", []))
+        if stored_ids != set(chunk_ids):
+            raise IngestionError(
+                f"Chroma verification failed for {source}: expected {len(chunk_ids)} chunks, found {len(stored_ids)}"
+            )
+    except IngestionError:
+        raise
     except Exception as exc:
         raise IngestionError(f"Could not update Chroma collection for {source}: {exc}") from exc
 

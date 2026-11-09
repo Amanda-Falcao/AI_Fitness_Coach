@@ -34,25 +34,48 @@ Foco: Alto gasto calórico e densidade do treino. Circuitos e supersets são mé
 
 # DETALHES DE EXERCÍCIOS E EXECUÇÃO
 
-Agachamento Livre (Barra):
+### Agachamento Livre (Barra)
+Região: Inferior.
 Músculos: Primário: Quadríceps e Glúteos. Secundário: Lombar e Core.
 Dicas: Mantenha a barra sobre a região média dos pés e a coluna neutra. Use uma amplitude controlada que consiga manter sem dor ou perda de posição; não imponha uma profundidade única para todas as pessoas.
 
-Supino Reto (Barra):
+### Supino Reto (Barra)
+Região: Superior.
 Músculos: Primário: Peitoral Maior. Secundário: Tríceps e Deltóide Anterior.
 Dicas: Mantenha as escápulas estáveis no banco e desça a barra com controle em direção à região média do peito. Use uma pegada confortável e estável.
 
-Levantamento Terra (Deadlift):
+### Levantamento Terra (Deadlift)
+Região: Inferior.
 Músculos: Cadeia Posterior (Glúteos, Isquiotibiais e Lombar).
 Dicas: Mantenha a barra próxima ao corpo, a coluna neutra e o tronco firme. Inicie o movimento empurrando o chão e estenda o quadril para ficar em pé.
 
-Remada Curvada (Barra):
+### Remada Curvada (Barra)
+Região: Superior.
 Músculos: Primário: Dorsais (Latíssimo). Secundário: Bíceps e Trapézio.
 Dicas: Mantenha o tronco firme e inclinado. Puxe a barra em direção ao abdômen, conduzindo o movimento com os cotovelos.
 
-Desenvolvimento Militar (Overhead Press):
+### Desenvolvimento Militar (Overhead Press)
+Região: Superior.
 Músculos: Deltoides e tríceps.
 Dicas: Contraia o abdômen e os glúteos para evitar compensar o movimento com a lombar. Mantenha a barra próxima ao rosto durante a subida.
+
+### Levantamento Terra Romeno (Romanian Deadlift)
+Região: Inferior.
+Músculos: Posteriores da coxa, glúteos e musculatura das costas.
+Dicas: Mantenha leve flexão nos joelhos e as costas retas. Leve o quadril para trás, mantenha a barra próxima ao corpo e retorne empurrando os calcanhares no chão.
+Fonte de execução e grupos-alvo: ACE Exercise Library — https://www.acefitness.org/resources/everyone/exercise-library/317/romanian-deadlift/.
+
+### Avanço Reverso (Reverse Lunge)
+Região: Inferior.
+Músculos: Glúteos e coxas.
+Dicas: Dê um passo para trás e flexione os joelhos de forma controlada, mantendo o tronco ereto; empurre o pé da frente para retornar à posição inicial.
+Fonte de execução e grupos-alvo: ACE Exercise Library — https://www.acefitness.org/resources/everyone/exercise-library/319/reverse-lunge/.
+
+### Flexão de Braços (Push-up)
+Região: Superior.
+Músculos: Peitoral, tríceps e ombros.
+Dicas: Apoie as mãos um pouco além da largura dos ombros, mantenha o tronco alinhado e desça com controle antes de empurrar o chão.
+Fonte de execução: ACE Exercise Library — https://www.acefitness.org/resources/everyone/exercise-library/41/push-up/.
 
 # ESCOPO DAS REFERÊNCIAS
 

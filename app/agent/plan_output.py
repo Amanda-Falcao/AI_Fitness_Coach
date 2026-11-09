@@ -7,26 +7,16 @@ from typing import Any
 
 
 _REFERENCE_PATTERN = re.compile(r"^KB-[0-9a-f]{12}$")
-_EXERCISE_ALIASES = {
-    "agachamento": ("agachamento", "squat"),
-    "supino": ("supino", "bench press"),
-    "levantamento terra": ("levantamento terra", "deadlift"),
-    "remada curvada": ("remada curvada", "bent row"),
-    "desenvolvimento militar": ("desenvolvimento militar", "overhead press"),
-}
+_WEEKLY_PROGRESSIONS = (
+    "Semana 1: estabeleça uma referência com boa execução e aproximadamente 1–2 RIR.",
+    "Semana 2: priorize aumentar repetições dentro da faixa somente se todas as séries forem concluídas com boa técnica; caso contrário, mantenha a meta.",
+    "Semana 3: aumente a carga somente se o limite superior da faixa for alcançado em todas as séries com boa execução; caso contrário, mantenha a carga e continue progredindo repetições.",
+)
 
 
 def _normalized_text(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value.casefold())
     return " ".join("".join(char for char in decomposed if not unicodedata.combining(char)).split())
-
-
-def _specific_evidence_terms(exercise_name: str) -> tuple[str, ...]:
-    normalized_name = _normalized_text(exercise_name)
-    for canonical, aliases in _EXERCISE_ALIASES.items():
-        if canonical in normalized_name or any(alias in normalized_name for alias in aliases):
-            return aliases
-    return (normalized_name,)
 
 
 class PlanValidationError(ValueError):
@@ -46,18 +36,21 @@ def groq_plan_response_format(sessions_per_week: int) -> dict[str, Any]:
         }
 
     text = {"type": "string"}
+    training_day = {"type": "integer", "enum": list(range(1, 8))}
     exercise = closed_object({
         "name": text,
         "sets": {"type": "integer"},
         "reps": text,
         "rest_seconds": {"type": "integer"},
-        "technique_cue": text,
         "evidence_ref": text,
     })
     session = closed_object({
-        "day": {"type": "integer"},
+        "day": training_day,
         "title": text,
-        **{f"exercise_{index}": exercise for index in range(1, 4)},
+        **{
+            f"exercise_{index}": {"$ref": "#/$defs/exercise"}
+            for index in range(1, 4)
+        },
     })
     safety = closed_object({
         "disclaimer": text,
@@ -66,15 +59,15 @@ def groq_plan_response_format(sessions_per_week: int) -> dict[str, Any]:
     })
     schema = closed_object({
         "title": text,
-        **{f"week_{week}_progression": text for week in range(1, 4)},
         **{
-            f"week_{week}_session_{session_number}": session
+            f"week_{week}_session_{session_number}": {"$ref": "#/$defs/session"}
             for week in range(1, 4)
             for session_number in range(1, sessions_per_week + 1)
         },
         "coach_analysis": text,
         "safety": safety,
     })
+    schema["$defs"] = {"exercise": exercise, "session": session}
     return {
         "type": "json_schema",
         "json_schema": {
@@ -106,7 +99,7 @@ def normalize_groq_plan(raw_content: str, sessions_per_week: int) -> str:
                         "sets": exercise["sets"],
                         "reps": exercise["reps"],
                         "rest_seconds": exercise["rest_seconds"],
-                        "technique_cues": [exercise["technique_cue"]],
+                        "technique_cues": [],
                         "evidence_refs": [exercise["evidence_ref"]],
                     })
                 sessions.append({
@@ -116,7 +109,7 @@ def normalize_groq_plan(raw_content: str, sessions_per_week: int) -> str:
                 })
             weeks.append({
                 "week": week_number,
-                "progression": plan.pop(f"week_{week_number}_progression"),
+                "progression": _WEEKLY_PROGRESSIONS[week_number - 1],
                 "sessions": sessions,
             })
         plan["weeks"] = weeks
@@ -133,7 +126,9 @@ def _require_text(value: Any, field: str, *, max_length: int = 2000) -> str:
 
 def _require_integer(value: Any, field: str, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-        raise PlanValidationError(f"{field} must be an integer between {minimum} and {maximum}")
+        raise PlanValidationError(
+            f"{field} must be an integer between {minimum} and {maximum}; received {value!r}"
+        )
     return value
 
 
@@ -150,6 +145,83 @@ def _require_keys(value: Any, expected: set[str], field: str) -> None:
         if extra:
             details.append("unexpected: " + ", ".join(extra))
         raise PlanValidationError(f"{field} has an invalid shape ({'; '.join(details)})")
+
+
+def _exercise_section(name: str, references: list[str], registry: dict[str, dict[str, str]]):
+    normalized_name = _normalized_text(name)
+    for reference in references:
+        citation = registry.get(reference)
+        if not citation:
+            continue
+        evidence = citation["evidence"]
+        normalized = _normalized_text(evidence)
+        heading = re.search(r"(?m)^###\s+(.+?)\s*$", evidence)
+        if not heading:
+            continue
+        heading_title = _normalized_text(heading.group(1))
+        parenthetical = re.search(r"\(([^()]*)\)\s*$", heading.group(1))
+        base_title = _normalized_text(re.sub(r"\s*\([^()]*\)\s*$", "", heading.group(1)))
+        names_in_heading = {heading_title, base_title}
+        if parenthetical:
+            names_in_heading.add(_normalized_text(parenthetical.group(1)))
+        if normalized_name not in names_in_heading:
+            continue
+        # Exercise evidence must be a discrete section containing its own
+        # title, muscle region, muscles, and documented cue.
+        if all(
+            marker in normalized for marker in ("regiao:", "musculos:", "dicas:")
+        ):
+            return reference, evidence
+    return None, None
+
+
+def _range_pair(value: str, field: str) -> tuple[int, int]:
+    match = re.fullmatch(
+        r"\s*(\d+)\s*(?:-|–|—|a)\s*(\d+)\s*(?:(?:reps|repeti[cç][oõ]es))?\s*",
+        value,
+        re.IGNORECASE,
+    )
+    if not match:
+        raise PlanValidationError(
+            f"{field} must be a documented numeric range; received {value!r}"
+        )
+    low, high = map(int, match.groups())
+    if low > high:
+        raise PlanValidationError(f"{field} has an inverted range; received {value!r}")
+    return low, high
+
+
+def _documented_hypertrophy_ranges(registry: dict[str, dict[str, str]]):
+    for citation in registry.values():
+        text = citation["evidence"]
+        if "hipertrofia" not in _normalized_text(text):
+            continue
+        match = re.search(
+            r"(\d+)\s*a\s*(\d+)\s*s[eé]ries\s*,\s*(\d+)\s*a\s*(\d+)\s*repeti[cç][oõ]es.*?(\d+)\s*a\s*(\d+)\s*segundos",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            return tuple(map(int, match.groups()))
+    raise PlanValidationError("Retrieved knowledge does not document hypertrophy sets, reps, and rest ranges")
+
+
+def _region(evidence: str) -> str:
+    muscles = re.search(r"(?im)^Músculos:\s*(.+)$", evidence)
+    declared = re.search(r"(?im)^Região:\s*(Superior|Inferior)\s*\.", evidence)
+    if not muscles or not declared:
+        raise PlanValidationError("Exercise section must document its region and muscles")
+    text = _normalized_text(muscles.group(1))
+    upper_markers = ("peitoral", "peito", "dorsal", "latissimo", "biceps", "triceps", "deltoid", "ombro", "trapezio", "braco")
+    lower_markers = ("quadriceps", "glute", "isquiotib", "coxa", "perna", "panturrilha")
+    has_upper = any(marker in text for marker in upper_markers)
+    has_lower = any(marker in text for marker in lower_markers)
+    if has_upper == has_lower:
+        raise PlanValidationError("Músculos do exercício do not identify one clear upper/lower region")
+    inferred = "superior" if has_upper else "inferior"
+    if _normalized_text(declared.group(1)) != inferred:
+        raise PlanValidationError("Declared exercise region conflicts with its documented Músculos")
+    return inferred
 
 
 def parse_and_validate_plan(
@@ -170,6 +242,7 @@ def parse_and_validate_plan(
     _require_keys(plan, {"title", "weeks", "coach_analysis", "safety"}, "plan")
 
     _require_text(plan.get("title"), "title", max_length=160)
+    sets_min, sets_max, reps_min, reps_max, rest_min, rest_max = _documented_hypertrophy_ranges(citation_registry)
     weeks = plan.get("weeks")
     if not isinstance(weeks, list) or len(weeks) != 3:
         raise PlanValidationError("Plan must contain exactly three weeks")
@@ -179,13 +252,15 @@ def parse_and_validate_plan(
         week_number = _require_integer(week.get("week"), f"week {week_index}.week", 1, 3)
         if week_number != week_index:
             raise PlanValidationError(f"Week entries must be numbered sequentially from 1 to 3 (expected {week_index})")
-        _require_text(week.get("progression"), f"week {week_index}.progression", max_length=500)
+        # Progression text is supplied deterministically below.
+        week["progression"] = _WEEKLY_PROGRESSIONS[week_index - 1]
         sessions = week.get("sessions")
         if not isinstance(sessions, list) or len(sessions) != sessions_per_week:
             raise PlanValidationError(
                 f"Week {week_index} must contain exactly {sessions_per_week} sessions"
             )
         days = set()
+        session_signatures = []
         for session_index, session in enumerate(sessions, start=1):
             label = f"week {week_index} session {session_index}"
             _require_keys(session, {"day", "title", "exercises"}, label)
@@ -197,6 +272,8 @@ def parse_and_validate_plan(
             exercises = session.get("exercises")
             if not isinstance(exercises, list) or len(exercises) != 3:
                 raise PlanValidationError(f"{label} must contain exactly 3 exercises")
+            signature = []
+            regions = []
             for exercise_index, exercise in enumerate(exercises, start=1):
                 exercise_label = f"{label} exercise {exercise_index}"
                 _require_keys(
@@ -205,14 +282,12 @@ def parse_and_validate_plan(
                     exercise_label,
                 )
                 _require_text(exercise.get("name"), f"{exercise_label}.name", max_length=120)
-                _require_integer(exercise.get("sets"), f"{exercise_label}.sets", 1, 10)
-                _require_text(exercise.get("reps"), f"{exercise_label}.reps", max_length=80)
-                _require_integer(exercise.get("rest_seconds"), f"{exercise_label}.rest_seconds", 0, 600)
-                cues = exercise.get("technique_cues")
-                if not isinstance(cues, list) or not 1 <= len(cues) <= 2:
-                    raise PlanValidationError(f"{exercise_label}.technique_cues must contain one or two cues")
-                for cue_index, cue in enumerate(cues, start=1):
-                    _require_text(cue, f"{exercise_label}.technique_cues[{cue_index}]", max_length=240)
+                sets = _require_integer(exercise.get("sets"), f"{exercise_label}.sets", 1, 10)
+                reps = _require_text(exercise.get("reps"), f"{exercise_label}.reps", max_length=80)
+                rest = _require_integer(exercise.get("rest_seconds"), f"{exercise_label}.rest_seconds", 0, 600)
+                rep_low, rep_high = _range_pair(reps, f"{exercise_label}.reps")
+                if not sets_min <= sets <= sets_max or not reps_min <= rep_low <= rep_high <= reps_max or not rest_min <= rest <= rest_max:
+                    raise PlanValidationError(f"{exercise_label} prescription is outside the documented hypertrophy ranges")
                 references = exercise.get("evidence_refs")
                 if not isinstance(references, list) or not 1 <= len(references) <= 3:
                     raise PlanValidationError(f"{exercise_label}.evidence_refs must contain one to three citations")
@@ -223,25 +298,31 @@ def parse_and_validate_plan(
                         raise PlanValidationError(
                             f"{exercise_label} cites evidence that was not returned by the RAG tool: {reference}"
                         )
-                specific_terms = _specific_evidence_terms(exercise["name"])
-                available_specific_refs = {
-                    ref_id
-                    for ref_id, citation in citation_registry.items()
-                    if any(term in _normalized_text(citation["evidence"]) for term in specific_terms)
-                }
-                if available_specific_refs and not available_specific_refs.intersection(references):
-                    raise PlanValidationError(
-                        f"{exercise_label} must cite the retrieved exercise-specific evidence"
-                    )
-
-    if sessions_per_week == 4:
-        expected_titles = ["upper a", "lower a", "upper b", "lower b"]
-        for week_index, week in enumerate(weeks, start=1):
-            titles = [session["title"].strip().casefold() for session in week["sessions"]]
-            if titles != expected_titles:
+                evidence_ref, evidence = _exercise_section(exercise["name"], references, citation_registry)
+                if evidence is None:
+                    raise PlanValidationError(f"{exercise_label} has no retrieved exercise-specific section")
+                cue_match = re.search(r"(?im)^Dicas:\s*(.+)$", evidence)
+                if not cue_match:
+                    raise PlanValidationError(f"{exercise_label} section has no documented technique cue")
+                exercise["technique_cues"] = [cue_match.group(1).strip()]
+                exercise["evidence_refs"] = [evidence_ref]
+                regions.append(_region(evidence))
+                signature.append((_normalized_text(exercise["name"]), sets, rep_low, rep_high, rest))
+            session_signatures.append((session["day"], session["title"], signature))
+            if sessions_per_week == 4:
+                expected_region = "inferior" if session_index in (2, 4) else "superior"
+                if any(region != expected_region for region in regions):
+                    raise PlanValidationError(f"{label} contains an exercise outside the {expected_region} region")
+        if sessions_per_week == 4:
+            expected_titles = ["upper a", "lower a", "upper b", "lower b"]
+            if [session["title"].strip().casefold() for session in sessions] != expected_titles:
                 raise PlanValidationError(
                     f"Week {week_index} must use the Upper A, Lower A, Upper B, Lower B split"
                 )
+        if week_index == 1:
+            first_week_signature = session_signatures
+        elif session_signatures != first_week_signature:
+            raise PlanValidationError("Session split and exercise prescriptions must remain stable across weeks")
 
     _require_text(plan.get("coach_analysis"), "coach_analysis", max_length=4000)
     safety = plan.get("safety")
@@ -262,22 +343,25 @@ def render_plan_markdown(
     """Render a validated plan deterministically for the CLI and notebook."""
     lines = [f"# {plan['title']}", ""]
     for week in plan["weeks"]:
-        lines.extend([
-            f"## Semana {week['week']}",
-            "",
-            f"**Progressão:** {week['progression']}",
-            "",
-        ])
+        lines.extend([f"## Semana {week['week']}", "", f"**Progressão:** {week['progression']}", ""])
         for index, session in enumerate(week["sessions"], start=1):
             lines.extend([f"### Sessão {index} — {session['title']} (Dia {session['day']})", ""])
+            lines.extend(["| Exercício | Séries | Repetições | Descanso | Referência |", "|---|---:|---:|---:|---|"])
             for exercise in session["exercises"]:
-                rest = exercise["rest_seconds"]
                 lines.append(
-                    f"- **{exercise['name']}** — {exercise['sets']} séries × {exercise['reps']} "
-                    f"(descanso: {rest}s) — Evidência: {', '.join(exercise['evidence_refs'])}"
+                    f"| {exercise['name']} | {exercise['sets']} | {exercise['reps']} | "
+                    f"{exercise['rest_seconds']} s | {', '.join(exercise['evidence_refs'])} |"
                 )
-                lines.extend(f"  - Técnica: {cue}" for cue in exercise["technique_cues"])
             lines.append("")
+
+    lines.extend(["## Guia de execução", ""])
+    cue_by_exercise = {}
+    for week in plan["weeks"][:1]:
+        for session in week["sessions"]:
+            for exercise in session["exercises"]:
+                cue_by_exercise[exercise["name"]] = exercise["technique_cues"][0]
+    lines.extend(f"- **{name}:** {cue}" for name, cue in cue_by_exercise.items())
+    lines.append("")
 
     lines.extend(["## Fontes da base de conhecimento", ""])
     used_references = {
@@ -287,12 +371,24 @@ def render_plan_markdown(
         for exercise in session["exercises"]
         for reference in exercise["evidence_refs"]
     }
+    exercise_names_by_reference: dict[str, list[str]] = {}
+    for week in plan["weeks"]:
+        for session in week["sessions"]:
+            for exercise in session["exercises"]:
+                for reference in exercise["evidence_refs"]:
+                    names = exercise_names_by_reference.setdefault(reference, [])
+                    if exercise["name"] not in names:
+                        names.append(exercise["name"])
     for reference in sorted(used_references):
         citation = citation_registry[reference]
-        evidence = citation["evidence"].replace("\n", " ").strip()
-        if len(evidence) > 360:
-            evidence = evidence[:357].rstrip() + "..."
-        lines.append(f"- **[{reference}]** `{citation['source']}` — {evidence}")
+        # Technique cues already appear once in the execution guide. Keep the
+        # reference focused on the same section's identity and target muscles.
+        evidence = "\n".join(
+            line for line in citation["evidence"].strip().splitlines()
+            if not line.startswith("Dicas:")
+        )
+        names = ", ".join(exercise_names_by_reference[reference])
+        lines.append(f"- **{names} — [{reference}]** `{citation['source']}`\n\n{evidence}")
 
     lines.extend(["", "## Análise do Coach e Estratégia", "", plan["coach_analysis"], "", "## Segurança", ""])
     lines.extend([f"- {plan['safety']['disclaimer']}", "", "**Pare se:**"])
