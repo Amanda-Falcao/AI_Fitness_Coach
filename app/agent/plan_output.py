@@ -286,8 +286,12 @@ def parse_and_validate_plan(
                 reps = _require_text(exercise.get("reps"), f"{exercise_label}.reps", max_length=80)
                 rest = _require_integer(exercise.get("rest_seconds"), f"{exercise_label}.rest_seconds", 0, 600)
                 rep_low, rep_high = _range_pair(reps, f"{exercise_label}.reps")
-                if not sets_min <= sets <= sets_max or not reps_min <= rep_low <= rep_high <= reps_max or not rest_min <= rest <= rest_max:
+                if not sets_min <= sets <= sets_max or not rest_min <= rest <= rest_max:
                     raise PlanValidationError(f"{exercise_label} prescription is outside the documented hypertrophy ranges")
+                if not reps_min <= rep_low <= rep_high <= reps_max:
+                    raise PlanValidationError(
+                        f"{exercise_label}.reps is outside the documented hypertrophy range; received {reps!r}"
+                    )
                 references = exercise.get("evidence_refs")
                 if not isinstance(references, list) or not 1 <= len(references) <= 3:
                     raise PlanValidationError(f"{exercise_label}.evidence_refs must contain one to three citations")

@@ -144,5 +144,5 @@ A CLI é o ponto de entrada reproduzível. A base vetorial não é distribuída 
 
 - Ampliar o conjunto de evidências do benchmark e revisar os resultados da recuperação com embeddings reais antes de ajustar o chunking ou o top-k.
 - Aplicar o roteiro de revisão a várias gerações reais e sintetizar as observações antes de ajustar prompts ou recuperação.
-- Adicionar métricas de latência e uso de tokens e avaliar a fidelidade das respostas em relação às evidências recuperadas.
+- Avaliar sistematicamente a fidelidade das respostas em relação às evidências recuperadas; os logs já registram latência e uso de tokens quando o provedor os informa.
 - Fixar as versões das dependências de execução e atualizá-las periodicamente.
