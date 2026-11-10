@@ -91,7 +91,7 @@ docker compose run --rm --entrypoint python fitness-coach \
   --goal hipertrofia
 ```
 
-O plano será salvo no host em `outputs/plano_teste_atualizado.md`. O Compose mantém os dados do Chroma e os arquivos do modelo Hugging Face em volumes nomeados.
+O plano será salvo no host em `outputs/plano_hipertrofia_3_semanas.md`. O Compose mantém os dados do Chroma e os arquivos do modelo Hugging Face em volumes nomeados.
 
 O caminho padrão calcula métricas localmente e não chama Tavily. O agente consulta a base RAG e pede ao LLM um plano conciso com três exercícios por sessão. Uma geração usa no máximo um ciclo RAG por padrão; o limite de recursão protege contra loops que consumiriam chamadas adicionais. Para permitir pesquisa externa, use a flag `--web-search`; ela adiciona o Tavily e pode consumir a cota gratuita separada desse serviço.
 

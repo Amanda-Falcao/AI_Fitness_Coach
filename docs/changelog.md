@@ -33,7 +33,7 @@
 - **Diagnóstico:** o plano com 12 sessões ultrapassou a conclusão padrão documentada de 1024 tokens, e arrays sem tamanho fixo permitiam respostas com menos semanas/sessões. Um schema aninhado também foi recusado pelo endpoint.
 - **Alterado:** o modelo com ferramentas continua responsável por chamar o RAG; após o retorno, uma instância sem ferramentas usa Structured Outputs com JSON Schema estrito e `max_completion_tokens=4096`. Cada sessão é obrigatória em uma chave plana numerada, seus três exercícios também são campos obrigatórios e a resposta é normalizada para listas antes da validação existente.
 - **Testes adicionados:** cobrem os campos obrigatórios do schema estrito, sua configuração no cliente e a seleção do modelo final depois do RAG, sem chamadas externas.
-- **Validação:** container runtime reconstruído; configuração do cliente verificada localmente; **64 testes passaram**. Geração real concluída com duas chamadas Groq HTTP 200, 12 sessões, duração de 4.22 s, 5,785 tokens de entrada e 2,408 de saída. O artefato atualmente mantido no projeto está em `outputs/plano_teste_atualizado.md`; nenhum Tavily foi chamado.
+- **Validação:** container runtime reconstruído; configuração do cliente verificada localmente; **64 testes passaram**. Geração real concluída com duas chamadas Groq HTTP 200, 12 sessões, duração de 4.22 s, 5,785 tokens de entrada e 2,408 de saída. O artefato atualmente mantido no projeto está em `outputs/plano_hipertrofia_3_semanas.md`; nenhum Tavily foi chamado.
 
 ## 2026-11-09 — Remoção de artefatos e código legado
 

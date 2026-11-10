@@ -27,7 +27,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gender", choices=("male", "female"), required=True)
     parser.add_argument("--frequency", type=int, required=True, help="Training days per week (1-7).")
     parser.add_argument("--goal", required=True, help="For example: hipertrofia, emagrecimento, or manutenção.")
-    parser.add_argument("--output", default="outputs/plano_teste_atualizado.md")
+    parser.add_argument("--output", default="outputs/plano_hipertrofia_3_semanas.md")
     parser.add_argument(
         "--web-search",
         action="store_true",
